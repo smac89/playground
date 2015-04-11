@@ -1,8 +1,8 @@
-#ifndef __CLOSESTPAIR__
-#define __CLOSESTPAIR__
+#ifndef __KDTREE__
+#define __KDTREE__
 
-#include <vector>
 #include "node.hpp"
+#include <vector>
 
 namespace spatial {
 
@@ -13,4 +13,4 @@ namespace spatial {
 			explicit kdtree(std::vector<kdnode> &list);
 	};
 }
-#endif // __CLOSESTPAIR__
+#endif // __KDTREE__
