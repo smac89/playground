@@ -7,15 +7,15 @@
 namespace spatial {
 
 	class kdtree {
-		std::vector<kdnode> points;
+		std::vector<kdnode *> points;
 		int dim;
 
-		void sortPoints(int start, int end, int level, bool=false);
+		void sortPoints(int start, int end, int level, bool stagger=false);
 
 		public:
-			explicit kdtree(std::vector<kdnode> &list);
-			std::pair<kdnode, kdnode> closestPair();
-
+			explicit kdtree(std::vector<kdnode *> &list);
+			std::pair<kdnode*, kdnode*> closestPair();
+			kdnode* nearestNeighbour(kdnode* node);
 	};
 }
 #endif // __KDTREE__
