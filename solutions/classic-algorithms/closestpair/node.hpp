@@ -13,8 +13,11 @@ namespace spatial {
 		int getCardinal() const;
 
 	protected:
+		double getDim(int dim) const;
+
 		template <std::size_t N>
 		explicit kdnode(const std::array<double, N> &coords);
+
 		int cardinality;
 		double *coords;
 

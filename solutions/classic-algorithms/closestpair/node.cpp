@@ -8,6 +8,10 @@ int kdnode::getCardinal() const {
 	return cardinality;
 }
 
+double kdnode::getDim(int dim) const {
+	return coords[dim];
+}
+
 template <std::size_t N>
 kdnode::kdnode(const std::array<double, N> &coords) {
 	if (N <= 1) {
