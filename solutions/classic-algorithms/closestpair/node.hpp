@@ -7,6 +7,8 @@
 namespace spatial {
 	
 	struct kdnode {
+		friend class kdtree;
+
 		virtual ~kdnode();
 		int getCardinal() const;
 
