@@ -1,7 +1,10 @@
 #include "node.hpp"
+#include "tree.hpp"
 #include <iostream>
+#include <vector>
+using namespace spatial;
 
 int main() {
-	spatial::kdnode3D node({8.9, 9.9});
-	std::cout << node << std::endl;
+	std::vector<kdnode2D*> nodes = kdtree::generateNodes<kdnode2D>(10);
+	return 0;
 }

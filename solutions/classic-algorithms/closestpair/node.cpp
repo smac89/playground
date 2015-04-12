@@ -26,8 +26,6 @@ namespace spatial {
 		return oss;
 	}
 
-
-
 	template <std::size_t N>
 	kdnode::kdnode(const std::array<double, N> &coords) {
 		if (N <= 1) {
