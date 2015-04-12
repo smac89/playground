@@ -25,7 +25,7 @@ namespace spatial {
         template <std::size_t T>
         friend std::ostream& operator << (std::ostream& oss, const kdNode<T>& node) {
             oss << "{" << node.coords[0];
-            for (int t = 1; t < N; t++) {
+            for (int t = 1; t < T; t++) {
                 oss << ", " << node.coords[t];
             }
             oss << "}";
