@@ -1,5 +1,7 @@
 #include "node.hpp"
+#include <iostream>
 
 int main() {
-	spatial::kdnode2D node({8.9, 9.9});
+	spatial::kdnode3D node({8.9, 9.9});
+	std::cout << node << std::endl;
 }
