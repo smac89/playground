@@ -14,6 +14,7 @@ namespace spatial {
 		virtual ~kdnode();
 		int getCardinal() const;
 
+
 	protected:
 		double getDim(int dim) const;
 		virtual double distTo(kdnode &other) const = 0;

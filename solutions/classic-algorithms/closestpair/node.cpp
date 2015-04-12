@@ -53,9 +53,7 @@ namespace spatial {
 		}
 	}
 
-	kdnode3D::kdnode3D(const std::array<double, 3> &coords) : kdnode(coords) {
-		std::cout << coords.size() << std::endl;
-	}
+	kdnode3D::kdnode3D(const std::array<double, 3> &coords) : kdnode(coords) {}
 
 	double kdnode3D::distTo(kdnode& other) const {
 		try {

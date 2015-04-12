@@ -87,8 +87,8 @@ namespace spatial {
 			end = mid;			// update end incase we need to search other half
 		}
 
-		// if the answer we got was not null...
-		if (close != nullptr) {
+		// if the answer we got was not null and we didn't get the node we were search for as an answer...
+		if (close != nullptr && close != node) {
 
 			// get the distance from the closest point to the point in question
 			double temp = close->distTo(*node);
@@ -140,20 +140,8 @@ namespace spatial {
 		return best;
 	}
 
-	template<typename T>
-	typename std::enable_if<std::is_base_of<kdnode, T>::value &&
-							!std::is_same<kdnode, T>::value,
-							std::vector<T*>>::type kdtree::generateNodes(int num, double lo, double hi) {
-		std::vector<T*> collection;
-
-		static std::random_device rd;
-    	static std::mt19937 mt(rd());
-    	auto dist = std::bind(std::uniform_real_distribution<double>(lo, hi), mt);
-
-    	// std::generate_n(std::back_inserter(collection), num, [&]() {
-
-    	// });
-
-		return collection;
-	}
+	// inform compiler of usages so that it is able to create this
+	// template std::vector<kdnode2D*> kdtree::generateNodes(int, double, double);
+	// template std::vector<kdnode3D*> kdtree::generateNodes(int, double, double);
+	// template std::vector<kdnode*> generateNodes<kdnode>(0);
 }
