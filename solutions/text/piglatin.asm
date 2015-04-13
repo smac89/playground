@@ -1,3 +1,7 @@
+# This program is written in mips assembly
+# The program only accepts ascii characters and uses memory mapped
+# IO to update the text as you type
+
 .data
 app:  .asciiz " way"
 buff: .space 200
