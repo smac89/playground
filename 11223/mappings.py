@@ -3,7 +3,7 @@ import sys
 def pretty_print(l, n):
 	size = len(l)
 	inner_join = lambda k, maxim: ("{\"%s\", '%s'}" %(l[j+1], l[j]) for j in xrange(k, maxim, 2))
-	return ",\n".join(", ".join(inner_join(k, min(k + n * 2, size))) for k in xrange(0, size, (rpl * 2)))
+	return ",\n".join(", ".join(inner_join(k, min(k + n * 2, size))) for k in xrange(0, size, (n * 2)))
 
 if __name__ == '__main__':
 	l = ['A', '.-', 'J', '.---', 'S', '...', '1', '.----', '.', '.-.-.-', ':', '---...', 
