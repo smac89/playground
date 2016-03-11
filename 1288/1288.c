@@ -10,6 +10,7 @@
 #define EARTH_RADIUS (6370.0)
 	
 #define deg_to_rad(deg)(deg * M_PI / 180)
+#define min(a,b)(a <= b ? a : b)
 
 #ifdef DEBUG
 #define MAX_SIZE 100
@@ -17,22 +18,28 @@
 #define MAX_SIZE 25
 #endif
 
+#define extra_args(args...) args
+#define str(s...) #s
+
 
 typedef int(*compare_args)(const void*, const void*, void **);
+
 typedef struct {
 	int lat, lon;
-	struct Airport** adjlist;
-	struct Airport* next;
+	int edge_size;
+	struct Airport** edges;
 } Airport;
 
 
 Airport airports[MAX_SIZE];
 
-double calculate_shortest_distance(int a1, int a2, int portcount, int fuel, int flightdist);
+double calculate_shortest_distance(int a1, int a2, int portcount, int max_dist);
 
 int main() {
-	int ports, step, fd, q, s, e, c, a;
+	int ports = 0, step = 0, fd = 0, q, s, e, c, a;
 	double ans;
+
+	puts(extra_args(ports, step, fd));
 
 	for (step = 1; scanf("%d%d", &ports, &fd) != EOF; step++) {
 		for (a = 0; a < ports; a++) {
@@ -43,7 +50,7 @@ int main() {
 
 		for (scanf("%d", &q); q--; ) {
 			scanf("%d%d%d", &s, &e, &c);
-			ans = calculate_shortest_distance(s - 1, e - 1, ports, c, fd);
+			ans = calculate_shortest_distance(s - 1, e - 1, ports, min(c, fd));
 			if (ans == -1) {
 				puts("impossible");
 			}else {
@@ -79,48 +86,25 @@ double get_distance_between_airports(const Airport* ap1, const Airport* ap2) {
 }
 
 
-/*#if (defined(__GNUC__) || defined(__GNUG__)) && !(defined(__clang__) || defined(__INTEL_COMPILER))
-#endif*/
+void add_edge(int a1, int a2) {
 
-int compare(const void* ap1, const void* ap2, void** args) {
-	int end = *(int*)(*args);
-	const Airport* a1 = (const Airport*)(ap1);
-	const Airport* a2 = (const Airport*)(ap2);
-
-	double dist1 = get_distance_between_airports(a1, &airports[end]);
-	double dist2 = get_distance_between_airports(a2, &airports[end]);
-	printf("%d\n", end);
-	return (int)(ceil(dist2 - dist1));
 }
 
-void sort(void* memory, size_t count, size_t elem_size, compare_args comp, int num_args, ...) {
-	va_list arg_list;
-	void **args = malloc(num_args * sizeof(void *));
-	int a;
+double calculate_shortest_distance(int a1, int a2, int portcount, int max_dist) {
+	int x, y, dist;
 
-	int fake_compare(const void* t1, const void* t2) {
-		return comp(t1, t2, args);
+	for (x = 0; x < portcount; x++) {
+		for (y = x + 1; y < portcount; y++) {
+			dist = (int)ceil(get_distance_between_airports(&airports[x], &airports[y]));
+			if (dist <= max_dist) {
+
+			}
+		}
 	}
-
-	va_start(arg_list, num_args);
-
-	for (a = 0; a < num_args; a++) {
-		args[a] = va_arg(arg_list, void*);
-	}
-
-	va_end(arg_list);
-
-	qsort(memory, count, elem_size, fake_compare);
-
-	for (a = 0; a < num_args; a++) {
-		free(args[a]);
-	}
-	free(args);
-}
-
-double calculate_shortest_distance(int a1, int a2, int portcount, int fuel, int flightdist) {
 
 	sort(airports, portcount, sizeof (Airport), &compare, 1, a2 - 1);
+
+	extra_args(a1, a2, fuel);
 
 	#ifdef DEBUG 
 	{
