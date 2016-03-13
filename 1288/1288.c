@@ -52,7 +52,7 @@ int main() {
 	return 0;
 }
 
-typedef int ( *pq_compare) (const void*, const void*); 
+typedef int ( *pq_compare) (const void*, const void*, ...); 
  
 typedef struct { 
 	void **elements;
@@ -89,15 +89,27 @@ static void pq_insert(PQ* pq, void* item) {
 			pq->elements[currpos] = pq->elements[best];
 			pq->elements[best] = temp;
 		}
-		currpos = pos;
+		currpos = best;
 	}
 }
 
 static void* pq_remove_best(PQ* pq) {
+	if (pq->num_elem == 0) {
+		fputs("Queue is empty", stderr);
+		return NULL;
+	}
+
+	if (pq->num_elem == 1) {
+		free(pq->elements[1]);
+		pq->elements[1] = NULL;
+		return NULL
+	}
+
+	pq->elements[1] = pq->elements[num_elem--];
 	
 }
 
-int diff_airports(const struct Airport* a1, const struct Airport* a2) {
+int diff_airports(const struct Airport* a1, const struct Airport* a2, int t) {
 	return 0;
 }
 
@@ -126,8 +138,8 @@ void read_airports(int num) {
 
 
 void dijkstra(int start, int end) {
-/*	PQ* pq = pq_init(20, diff_airports);
-*/}
+	PQ* pq = pq_init(20, diff_airports);
+}
 
 /**
  * http://janmatuschek.de/LatitudeLongitudeBoundingCoordinates#Distance
