@@ -52,52 +52,50 @@ int main() {
 	return 0;
 }
 
-#define PRIORITY_Q(elem_type) \
-typedef int (compare_##elem_type *) (const elem_type*, const elem_type*); \
- \
-typedef struct { \
-	elem_type *elements; \
-	size_t size_pq, num_elem; \
-	compare_##elem_type cmp; \
-} PQ_##elem_type; \
- \
- \
-static PQ_##elem_type* pq_init(size_t cap, compare_##elem_type cmp) { \
-	PQ_##elem_type* p = malloc(sizeof (PQ_##elem_type)); \
-	p->elements = malloc(sizeof (elem_type) * (cap + 1)); \
-	p->size_pq = cap + 1; \
-	p->num_elem = 0; \
-	p->cmp = cmp; \
-	return p; \
-} \
- \
- \
-static void pq_insert(PQ_##elem_type* pq, elem_type item) { \
+typedef int ( *pq_compare) (const void*, const void*); 
+ 
+typedef struct { 
+	void **elements;
+	size_t size_pq, num_elem;
+	pq_compare cmp;
+} PQ;
+
+static PQ* pq_init(size_t cap, pq_compare cmp) {
+	PQ* p = malloc(sizeof (PQ));
+	p->elements = malloc(sizeof (void**) * (cap + 1));
+	p->size_pq = cap + 1;
+	p->num_elem = 0;
+	p->cmp = cmp;
+	return p;
+}
+ 
+static void pq_insert(PQ* pq, void* item) {
 	/* If the number capacity of the queue has been reached, then this will print
-	an error message */ \
-	if (pq->num_elem >= pq->size_pq) { \
-		puts("MAX CAPACITY OF Priority queue HAS BEEN REACHED!!!"); \
-		return; \
-	} \
-	size_t pos, curpos = pq->num_elem; \
-	elem_type temp, *best = NULL; \
-	*pq->elements[++pq->num_elem] = item; \
- \
-	while (currpos > 1) { \
-		if (pq->cmp(pq->elements[currpos >> 1], pq->elements[(currpos >> 1) + 1]) < 0) \
-			pos = (currpos >> 1) + 1; \
-		else pos = currpos >> 1; \
-		best = &pq->elements[pos]; \
-		if (pq->cmp(pq->elements[currpos], best) < 0) { \
-			temp = *pq->elements[currpos]; \
-			*pq->elements[currpos] = *best; \
-			*best = temp; \
-		} \
-		currpos = pos; \
-	} \
+	an error message */
+	if (pq->num_elem >= pq->size_pq) {
+		fputs("MAX CAPACITY OF Priority queue HAS BEEN REACHED!!!", stderr);
+		return;
+	}
+	size_t best, currpos = pq->num_elem;
+	void* temp = NULL;
+	pq->elements[++pq->num_elem] = item;
+
+	while (currpos > 1) {
+		if (pq->cmp(pq->elements[currpos >> 1], pq->elements[(currpos >> 1) + 1]) < 0)
+			best = (currpos >> 1) + 1;
+		else best = currpos >> 1;
+		if (pq->cmp(pq->elements[currpos], pq->elements[best]) < 0) {
+			temp = pq->elements[currpos];
+			pq->elements[currpos] = pq->elements[best];
+			pq->elements[best] = temp;
+		}
+		currpos = pos;
+	}
 }
 
-PRIORITY_Q(int)
+static void* pq_remove_best(PQ* pq) {
+	
+}
 
 int diff_airports(const struct Airport* a1, const struct Airport* a2) {
 	return 0;
