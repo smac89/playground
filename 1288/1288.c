@@ -5,8 +5,14 @@
 
 #define PI (3.141592653589793)
 #define EARTH_RADIUS (6370.0)
-#define MAX_DIST_BETWEEN (1e9 + 7)
-	
+#define TO_RAD (PI / 180)
+#define TO_DEG (180 / PI)
+
+#define MIN_LAT	(-90 * (TO_RAD)) /* -PI / 2*/
+#define MAX_LAT (90 * (TO_RAD)) /* PI / 2*/
+#define MIN_LON (-180 * (TO_RAD)) /* -PI*/
+#define MAX_LON (180 * (TO_RAD)) /* PI*/
+
 #define min(a,b)(a <= b ? a : b)
 /*#define NDEBUG*/ /*Used to turn off assertions*/
 
@@ -103,20 +109,49 @@ static type* pq_pop_##id(PQ_##id* pq) {\
 /*The right child*/
 #define childr(pq, parent) ((parent << 1) + 1 > pq->num_elem ? parent : (parent << 1) + 1)
 
+typedef unsigned char byte;
+
+/**
+ * Swaps the contents of two memory locations. This function assumes there is no
+ * overlap between memory1 and memory2
+ * This function is unsafe because it does not check memory bounds
+ * @param memory1   The start of the first memory address
+ * @param memory2   The start of the second memory address
+ * @param num_bytes The size in bytes of the amount of memory to swap
+ */
+void unsafe_memswap(void *memory1, void *memory2, size_t num_bytes) {
+	register byte * p1 = (byte *)(memory1);
+	register byte * p2 = (byte *)(memory2);
+	byte run;
+	if (memory1 != memory2) {
+		while (num_bytes --) {
+			run = *p1;
+			*p1++ = *p2;
+			*p2++ = run;
+		}
+	}
+}
+
 #endif /*PRIORITY_Q_TEMPLATE*/
 
 struct Airport {
-	int lat, lon, edge_size;
+	int edge_size;
 	short id;
+	struct GeoLoc{
+		int lat, lon;
+		double rad_lat, rad_lon;
+	}loc;
+
 	struct Edge {
 		double distTo;
 		struct Airport* adj;
 	}edges[MAX_SIZE];
+
 } airports[MAX_SIZE];
 
 PRIORITY_Q_TEMPLATE(airp, struct Airport);
 void read_airports(int num);
-double calculate_shortest_distance(int a1, int a2, int portcount, double max_dist);
+double calculate_shortest_distance(int a1, int a2, int portcount, double fuel_cap, double flight_dist);
 
 int main() {
 	int ports = 0, step = 0, q, s, e, a;
@@ -129,7 +164,7 @@ int main() {
 
 		for (scanf("%d", &q); q--; ) {
 			scanf("%d%d%lf", &s, &e, &c);
-			ans = calculate_shortest_distance(s - 1, e - 1, ports, min(c, fd));
+			ans = calculate_shortest_distance(s - 1, e - 1, ports, c, fd);
 			if (ans < 0) {
 				puts("impossible");
 			}else {
@@ -152,11 +187,18 @@ void add_edge(int a1, int a2, double distTo) {
 }
 
 void read_airports(int num) {
-	int a;
+	int a, lon, lat;
+	struct Airport* ap;
 	for (a = 0; a < num; a++) {
-		scanf("%d%d", &airports[a].lon, &airports[a].lat);
-		airports[a].edge_size = 0;
-		airports[a].id = a;
+		scanf("%d%d", &lon, &lat);
+		ap = &airports[a];
+		ap->loc.lon = lon - 180;
+		ap->loc.lat = lat;
+		ap->loc.rad_lon = ap->loc.lon * TO_RAD;
+		ap->loc.rad_lat = ap->loc.lat * TO_RAD;
+
+		ap->edge_size = 0;
+		ap->id = a;
 	}
 }
 
@@ -167,20 +209,14 @@ void read_airports(int num) {
  * @return     The distance between the two airports
  */
 double get_distance_between_airports(const struct Airport* ap1, const struct Airport* ap2) {
-	static double cache_this = PI / 180;
 	static double double_earth = EARTH_RADIUS * 2;
 
-	/*Convert each value to radians*/
-	double lat1 = ap1->lat * cache_this,
-	lat2 = ap2->lat * cache_this,
-	lon1 = ap1->lon * cache_this,
-	lon2 = ap2->lon * cache_this;
-
-	double a = 0.5 - cos(lat2 - lat1) / 2 + cos(lat1) * cos(lat2) * (1 - cos(lon2 - lon1))/2;
+	double a = 0.5 - cos(ap2->loc.rad_lat - ap1->loc.rad_lat) / 2 + 
+	cos(ap1->loc.rad_lat) * cos(ap2->loc.rad_lat) * (1 - cos(ap2->loc.rad_lon - ap1->loc.rad_lon))/2;
   	return double_earth * asin(sqrt(a));
 }
 
-double dijkstra(const int start, const int end, const int num_elem) {
+double short_path(const int start, const int end, const int num_elem) {
 	double distTo[MAX_SIZE];
 	int edge_start;
 	struct Airport* top = &airports[start];
@@ -189,8 +225,8 @@ double dijkstra(const int start, const int end, const int num_elem) {
 	int diff_airports(const struct Airport* a1, const struct Airport* a2) {
 		double d1 = get_distance_between_airports(a1, &airports[end]);
 		double d2 = get_distance_between_airports(a2, &airports[end]);
-		int sign = d1 < d2 ? -1 : 1;
-		return (int)ceil(abs(d1 - d2)) * sign;
+		double diff = d1 - d2;
+		return diff < 0 ? -1 : diff > 0 ? 1 : 0;
 	}
 
 	PQ_airp* pq = pq_init_airp(num_elem, diff_airports);
@@ -212,8 +248,8 @@ double dijkstra(const int start, const int end, const int num_elem) {
 	while (pq->num_elem > 0) {
 		do {
 			top = pq_pop_airp(pq);
-		while (((visited >> top->id)&1));
-		
+		}while (((visited >> top->id)&1));
+
 		if (top->id == end) {
 			break;
 		}
@@ -247,15 +283,54 @@ char* to_string(const struct Airport* ap) {
 }
 #endif
 
-double calculate_shortest_distance(int a1, int a2, int portcount, double max_dist) {
+/*http://janmatuschek.de/LatitudeLongitudeBoundingCoordinates*/
+void bounding_coordinates(struct Airport* start, double max_dist, struct GeoLoc (values)[2]) {
+	assert(max_dist >= 0);
+
+	/*Angular distance in radians on a great circle*/
+	double rad_dist = max_dist / EARTH_RADIUS;
+	double minLat = start->loc.rad_lat - rad_dist;
+	double maxLat = start->loc.rad_lat + rad_dist;
+	double minLon, maxLon, deltaLon;
+
+	if (minLat > MIN_LAT && maxLat < MAX_LAT) {
+		deltaLon = asin(sin(rad_dist) / cos(start->loc.rad_lat));
+		minLon = start->loc.rad_lon - deltaLon;
+		if (minLon < MIN_LON) minLon += PI * 2;
+		maxLon = start->loc.rad_lon + deltaLon;
+		if (maxLon > MAX_LON) maxLon -= PI * 2;
+	} else {
+		/*	a pole is within the distance*/
+		minLat = (minLat > MIN_LAT ? minLat : MIN_LAT);
+		maxLat = (maxLat < MAX_LAT ? maxLat : MAX_LAT);
+		minLon = MIN_LON;
+		maxLon = MAX_LON;
+	}
+
+	struct GeoLoc *p = values;
+	p->rad_lat = minLat;
+	p->rad_lon = minLon;
+	p->lat = minLat * TO_DEG;
+	p->lon = minLon * TO_DEG;
+
+	p++;
+	p->rad_lat = maxLat;
+	p->rad_lon = maxLon;
+	p->lat = maxLat * TO_DEG;
+	p->lon = maxLon * TO_DEG;
+}
+
+double calculate_shortest_distance(int a1, int a2, int portcount, double fuel_cap, double flight_dist) {
 	int x, y;
 	double dist;
+	struct Airport *temp;
 
 	for (x = 0; x < portcount; x++) {
 		for (y = x + 1; y < portcount; y++) {
 			dist = get_distance_between_airports(&airports[x], &airports[y]);
-			if (dist <= max_dist) {
-				add_edge(x, y, dist);
+			if (dist <= fuel_cap) {
+				if (dist <= flight_dist || 1/*Check if the path from x to y has airports that are atleast flight_dist away*/)
+					add_edge(x, y, dist);
 			}
 		}
 	}
@@ -278,6 +353,6 @@ double calculate_shortest_distance(int a1, int a2, int portcount, double max_dis
 	}
 	#endif
 
-	dist = dijkstra(a1, a2, portcount);
+	dist = short_path(a1, a2, portcount);
 	return dist;
 }
