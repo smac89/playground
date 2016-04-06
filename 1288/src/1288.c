@@ -13,7 +13,6 @@
 #define MIN_LON (-180 * (TO_RAD)) /* -PI*/
 #define MAX_LON (180 * (TO_RAD)) /* PI*/
 
-#define min(a,b)(a <= b ? a : b)
 /*#define NDEBUG*/ /*Used to turn off assertions*/
 
 #ifdef DEBUG
@@ -134,6 +133,57 @@ void unsafe_memswap(void *memory1, void *memory2, size_t num_bytes) {
 
 #endif /*PRIORITY_Q_TEMPLATE*/
 
+
+
+
+
+#ifndef CONNECTED_COMPONENT
+#define CONNECTED_COMPONENT(id) \
+typedef size_t type; \
+typedef struct { \
+	type *cc; \
+} CC_##id; \
+\
+static CC_##id* cc_init_##id(size_t size) { \
+	CC_##id *component = malloc(sizeof (CC_##id)); \
+	component->cc = malloc(sizeof (type) * size + 1); \
+	type i; \
+	for (i = 1; i <= size; i++) { \
+		/* Initially everything is in it's own connected component*/ \
+		component->cc[i] = i; \
+	} \
+	return component; \
+} \
+\
+type CC_find_##id (CC_##id* component, type child) { \
+	if (component->cc[child] == child) { \
+		return child; \
+	} \
+	/* Compress the path */ \
+	component->cc[child] = component->cc[component->cc[child]]; \
+	return CC_find_##id(component, component->cc[child]); \
+} \
+\
+void CC_union_##id (CC_##id* component, type c1, type c2) { \
+	component->cc[CC_find_##id(component, c1)] = CC_find_##id(component, c2); \
+}\
+\
+int CC_isconnected_##id (CC_##id* component, type c1, type c2) { \
+	return CC_find_##id(component, c1) == CC_find_##id(component, c2); \
+}
+#endif /*CONNECTED_COMPONENT*/
+
+
+struct node {
+	short id;
+	double rad_lat, rad_lon;
+	int edge_size
+	unsigned long long has_edge_to;
+	struct edge {
+		struct node *adj;
+	} edges[MAX_SIZE];
+} nodes[MAX_SIZE];
+
 struct Airport {
 	int edge_size;
 	short id;
@@ -150,9 +200,15 @@ struct Airport {
 } airports[MAX_SIZE];
 
 PRIORITY_Q_TEMPLATE(airp, struct Airport);
+CONNECTED_COMPONENT(airp);
 void read_airports(int num);
 double calculate_shortest_distance(int a1, int a2, int portcount, double fuel_cap, double flight_dist);
 
+
+/**
+ * Main entry point
+ * @return program exit status
+ */
 int main() {
 	int ports = 0, step = 0, q, s, e, a;
 	double ans, c, fd;
@@ -175,41 +231,46 @@ int main() {
 	return 0;
 }
 
-void add_edge(int a1, int a2, double distTo) {
-	struct Airport *w = &airports[a1], *v = &airports[a2];
+void add_edge(int a1, int a2) {
+	struct node *w = &nodes[a1], *v = &nodes[a2];
 
-	/*If there is already an edge between these 2, just ignore them*/
-	if (w->has_edge_to & (1 << v->id)) {
+	/*If there is already an edge between these 2, then don't add a new edge*/
+	if (w->has_edge_to & (1ULL << v->id)) {
 		return;
 	}
-	struct Edge *edge = &w->edges[w->edge_size++];
-	edge->distTo = distTo;
+	struct edge *edge = &w->edges[w->edge_size++];
 	edge->adj = v;
 
+
 	edge = &v->edges[v->edge_size++];
-	edge->distTo = distTo;
 	edge->adj = w;
 
 	/*Mark that there exists an edge between the airports*/
-	w->has_edge_to |= (1 << v->id);
-	v->has_edge_to |= (1 << w->id);
+	w->has_edge_to |= (1ULL << v->id);
+	v->has_edge_to |= (1ULL << w->id);
 }
 
 void read_airports(int num) {
 	int a, lon, lat;
-	struct Airport* ap;
+	struct node* ap;
 	for (a = 0; a < num; a++) {
 		scanf("%d%d", &lon, &lat);
-		ap = &airports[a];
-		ap->loc.lon = lon - 180;
-		ap->loc.lat = lat;
-		ap->loc.rad_lon = ap->loc.lon * TO_RAD;
-		ap->loc.rad_lat = ap->loc.lat * TO_RAD;
+		lon -= 180;
+		ap = &noodes[a];
+		ap->rad_lat = lat * TO_RAD;
+		ap->rad_lon = lon * TO_RAD;
 
 		ap->edge_size = 0;
 		ap->id = a;
-		ap->has_edge_to = 0; /*Has to edge to no one initially*/
+		ap->has_edge_to = 0ULL; /*Has to edge to no one initially*/
 	}
+}
+
+int intersects_circle(const struct node* a, const struct node* b, const double radius) {
+	double diffx = a->rad_lat - b->rad_lat;
+	double diffy = a->rad_lon - b->rad_lon;
+	double length = sqrt(diffx * diffx + diffy * diffy);
+	return length <= radius * 2;
 }
 
 /**
@@ -218,23 +279,23 @@ void read_airports(int num) {
  * @param  ap2 The second airport
  * @return     The distance between the two airports
  */
-double get_distance_between_airports(const struct Airport* ap1, const struct Airport* ap2) {
+double get_distance_between_airports(const struct node* ap1, const struct node* ap2) {
 	static double double_earth = EARTH_RADIUS * 2;
 
-	double a = 0.5 - cos(ap2->loc.rad_lat - ap1->loc.rad_lat) / 2 + 
-	cos(ap1->loc.rad_lat) * cos(ap2->loc.rad_lat) * (1 - cos(ap2->loc.rad_lon - ap1->loc.rad_lon))/2;
+	double a = 0.5 - cos(ap2->rad_lat - ap1->rad_lat) / 2 + 
+	cos(ap1->rad_lat) * cos(ap2->rad_lat) * (1 - cos(ap2->rad_lon - ap1->rad_lon))/2;
   	return double_earth * asin(sqrt(a));
 }
 
 double short_path(const int start, const int end, const int num_elem) {
 	double distTo[MAX_SIZE];
 	int edge_start;
-	struct Airport* top = &airports[start];
-	struct Edge* edge;
+	struct node* top = &nodes[start];
+	struct edge* edge;
 
-	int diff_airports(const struct Airport* a1, const struct Airport* a2) {
-		double d1 = get_distance_between_airports(a1, &airports[end]);
-		double d2 = get_distance_between_airports(a2, &airports[end]);
+	int diff_airports(const struct node* a1, const struct node* a2) {
+		double d1 = get_distance_between_airports(a1, &nodes[end]);
+		double d2 = get_distance_between_airports(a2, &nodes[end]);
 		double diff = d1 - d2;
 		return diff < 0 ? -1 : diff > 0 ? 1 : 0;
 	}
@@ -293,106 +354,19 @@ char* to_string(const struct Airport* ap) {
 }
 #endif
 
-/*http://janmatuschek.de/LatitudeLongitudeBoundingCoordinates*/
-/**
- * When this fu
- */
-void bounding_coordinates(struct Airport* start, double max_dist, struct GeoLoc (values)[2]) {
-
-	/*Angular distance in radians on a great circle*/
-	double rad_dist = max_dist / EARTH_RADIUS;
-	double minLat = start->loc.rad_lat - rad_dist;
-	double maxLat = start->loc.rad_lat + rad_dist;
-	double minLon, maxLon, deltaLon;
-
-	if (minLat > MIN_LAT && maxLat < MAX_LAT) {
-		deltaLon = asin(sin(rad_dist) / cos(start->loc.rad_lat));
-		minLon = start->loc.rad_lon - deltaLon;
-		if (minLon < MIN_LON) minLon += PI * 2;
-		maxLon = start->loc.rad_lon + deltaLon;
-		if (maxLon > MAX_LON) maxLon -= PI * 2;
-	} else {
-		/*	a pole is within the distance*/
-		minLat = (minLat > MIN_LAT ? minLat : MIN_LAT);
-		maxLat = (maxLat < MAX_LAT ? maxLat : MAX_LAT);
-		minLon = MIN_LON;
-		maxLon = MAX_LON;
-	}
-
-	/*SW corner*/
-	struct GeoLoc *p = values;
-	p->rad_lat = minLat;
-	p->rad_lon = minLon;
-	p->lat = minLat * TO_DEG;
-	p->lon = minLon * TO_DEG;
-
-	p++;
-	/*NE Corner*/
-	p->rad_lat = maxLat;
-	p->rad_lon = maxLon;
-	p->lat = maxLat * TO_DEG;
-	p->lon = maxLon * TO_DEG;
-}
-
-int loc_within_boundingBox(struct GeoLoc* loc, struct GeoLoc (boundBox)[2]) {
-	int meridian180 = boundBox[0].rad_lon > boundBox[1].rad_lon;
-
-	int withinLat = loc->rad_lat >= boundBox[0].rad_lat && 
-	loc->rad_lat <= boundBox[1].rad_lat;
-
-	int withinLoc = loc->rad_lon >= boundBox[0].rad_lon;
-	withinLoc = meridian180 ? withinLoc || loc->rad_lon <= boundBox[1].rad_lon : withinLoc && loc->rad_lon <= boundBox[1].rad_lon;
-
-	return withinLat && withinLoc;
-}
-
 double calculate_shortest_distance(int a1, int a2, int portcount, double fuel_cap, double flight_dist) {
 	int w, x, y, z;
 	double dist;
-	struct Airport *temp, *array[MAX_SIZE];
+	struct node *temp, *array[MAX_SIZE];
 	struct GeoLoc boundBox[2];
 
-
 	for (x = 0; x < portcount; x++) {
 		for (y = x + 1; y < portcount; y++) {
-			dist = get_distance_between_airports(&airports[x], &airports[y]);
-			if (dist <= fuel_cap) { /*Is it even possible to get to this airport??*/
-				if (dist <= flight_dist) {
-					add_edge(x, y, dist);
+			dist = get_distance_between_airports(&nodes[x], &nodes[y]);
+			if (dist <= flight_dist) {
+				if (intersects_circle(&nodes[x], &nodes[y], flight_dist)) {
+					add_edge(x, y);
 				}
-			}
-		}
-	}
-
-	for (x = 0; x < portcount; x++) {
-		z = 0;
-		#ifdef DEBUG
-		{
-			printf("Before: {%d, %d} ~ {%d, %d}\n", boundBox[0].lat, boundBox[0].lon, boundBox[1].lat, boundBox[1].lon);
-		}
-		#endif
-		/*Calculate the bounding box of the location*/
-		bounding_coordinates(&airports[x], flight_dist, boundBox);
-
-		#ifdef DEBUG
-		{
-			char *p = to_string(&airports[x]);
-			printf("For %s\n", p);
-			free(p);
-			printf("Bounding Box: {%d, %d} ~ {%d, %d}\n", boundBox[0].lat, boundBox[0].lon, boundBox[1].lat, boundBox[1].lon);
-		}
-		#endif
-		for (y = x + 1; y < portcount; y++) {
-			/*Check if the path from x to y has airports that are atleast flight_dist away*/
-			if (loc_within_boundingBox(&airports[y].loc, boundBox)) {
-				array[z++] = &airports[y];
-			}
-		}
-
-		/* For everyone within x's bounding box, we create an edge between them*/
-		for (w = 0; w < z; w++) {
-			for (y = w + 1; y < z; y++) {
-				add_edge(array[w]->id, array[y]->id, get_distance_between_airports(array[w], array[y]));
 			}
 		}
 	}

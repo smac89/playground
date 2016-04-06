@@ -4,9 +4,13 @@
 # Don't ignore directories
 !*/
 
-# Unignore all with extensions
-!*.*
+# ignore folders that begin with dot
+**/.idea/
+
+# Don't ignore things with extensions
+#!*.*
 
 # Ignore these folders
 12726/
 1570/
+
