@@ -1,16 +1,16 @@
-import Data.Set (Set)
-
 {-- |
-A happy number is defined by the following process.
-Starting with any positive integer, replace the number by the sum of
-the squares of its digits, and repeat the process until
-the number equals 1 (where it will stay), or it loops endlessly in a
-cycle which does not include 1.
+let n be in the range 10^0 to 10^k where k >= 0
+1. Find the first number h which when squared is not greater than n
+2. If such a number does not exist, go to the next value of n and start at step 1
+3. Determine if (n - h^2) is a perfect square; if it is, then output h and the square root of the difference
+computed, then go to step 1
+4. Otherwise repeat step 1 -}
 
-Those numbers for which this process ends in 1 are happy numbers,
-while those that do not end in 1 are unhappy numbers.
-Display an example of your output here. Find first 8 happy numbers. -}
+main :: IO ()
+main = do
+	num <- putStr "How many happy numbers to find? " >> readLn :: IO Int
+	happy num
 
-ishappy :: Integer -> Bool
-ishappy n | n <= 0 = False
-		  | otherwise = 
+happy :: Int -> IO ()
+happy n | n <= 0 = putStr ""
+		| otherwise = ???
