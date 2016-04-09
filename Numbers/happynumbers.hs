@@ -1,16 +1,13 @@
-import Data.Set (Set)
+import Data.Char (digitToInt)
 
-{-- |
-A happy number is defined by the following process.
-Starting with any positive integer, replace the number by the sum of
-the squares of its digits, and repeat the process until
-the number equals 1 (where it will stay), or it loops endlessly in a
-cycle which does not include 1.
+main :: IO ()
+main = do
+	numbers <- putStr "How many happy numbers to find? " >> readLn :: IO Int
+	print $ happy numbers
 
-Those numbers for which this process ends in 1 are happy numbers,
-while those that do not end in 1 are unhappy numbers.
-Display an example of your output here. Find first 8 happy numbers. -}
-
-ishappy :: Integer -> Bool
-ishappy n | n <= 0 = False
-		  | otherwise = 
+happy :: Int -> [Integer]
+happy n = take n $ filter isHappy [1..]
+	where isHappy n | n == 4 = False
+					| n == 1 = True
+			  		| otherwise = isHappy $ reduce n
+			  		where reduce = floor . (foldr (+) 0).(map $ (^ 2) . fromIntegral . digitToInt).show
