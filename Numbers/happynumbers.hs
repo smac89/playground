@@ -6,7 +6,7 @@ main = do
 	print $ happy numbers
 
 happy :: Int -> [Integer]
-happy n = take n $ filter isHappy [1..]
+happy = (`take` (filter isHappy [1..]))
 	where isHappy n | n == 4 = False
 					| n == 1 = True
 			  		| otherwise = isHappy $ reduce n
