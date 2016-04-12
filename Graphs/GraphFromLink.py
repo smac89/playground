@@ -1,120 +1,87 @@
-import re
-from collections import namedtuple
-
-class Node(object):
-	__slots__ = ['name', 'id']
-
-	def __init__(self, ident, name=None):
-		if name is not None:
-			self.name = name
-		else: self.name = str(ident)
-		self.id = ident
-
-	def __repr__ (self):
-		"""
-		calling the print function on this object will call this function
-		"""
-		return self.name
-
-	def __str__(self):
-		"""
-		Calling the str method on this object will use this method
-		"""
-		return "id=%s, name=%s" % (str(self.id), self.name)
-
-	def __hash__(self):
-		return hash((self.name, self.id))
-
-	def __eq__(self, other):
-		if type(other) is type(self):
-			return self.__dict__ == other.__dict__
-		return False
-
+import os
+import sys
+import csv
+import collections
 
 class Graph(object):
-	PATTERNS = [re.compile(r'.*?\((.+?)\)(?:->\((.+?)\)\s*)?'),
-		re.compile(r'.*?\((.+?)\)(?:<->\((.+?)\)\s*)?')]
-	DIRECTED, UNDIRECTED = range(2)
-	__slots__ = ['nodes', 'size', 'pattern']
+	FIELDNAMES = ['head', 'tail']
+	__slots__ = ['nodes', 'size']
 
-	def __init__(self):
-		self.nodes = dict()
-		self.size = 0
-		self.pattern = PATTERNS[DIRECTED]
+	def __init__(self, size):
+		if size <= 0:
+			raise ValueError("The size of the graph has to be greater than 0")
+		self.nodes = [set() for _ in range(size)]
+		self.size = size
 
 	def add_edge(self, n1, n2):
 		"""
 		Add an edge between n1 and n2
 		"""
-		if n1.lower() not in self.nodes:
-			n1 = Node(self.size + 1, n1)
-		else: n1 = self.nodes[n1.lower()]
-			n1 = Node()
-
-		# self.check_valid_node(n1.ident)
-		# self.check_valid_node(n2.ident)
+		self.check_valid_node(n1)
+		self.check_valid_node(n2)
 		
-		# self.nodes[n1] = n2
-		pass
+		self.nodes[n1 - 1].add(n2)
 
+	def check_valid(self, index):
+		if index <= 0 or index > self.size:
+			raise ValueError("The node does not exist: %d" %index)
 
-	def parse_line(self, line):
-		match = self.pattern.search(line)
-		if match:
-			components = match.groups()
-			return namedtuple('Edge', 'head, tail, weight')
-			
-			return components
-		raise SyntaxError("Invalid syntax on input: (%s)" %line)
+	def parse_row(self, row):
+		n1 = row['head']
+		n2 = row['tail']
+		self.add_edge(int(n1), int(n2))
+
+	def __repr__(self):
+		return "%d\n%s\n" %(self.size, "\n".join("%d -> %d" %(n, len(self.nodes[n-1])) for n in range(self.size)))
+
+	def __str__(self):
+		return "%d\n%s\n" %(self.size, "\n".join("%d -> %s" %(n, str(self.nodes[n-1])) for n in range(self.size)))
 
 	@classmethod
-	def from_file(cls, f):
-		with f:
-			try:
-				# create the graph from the class we are given
-				graph = cls()
+	def from_csv(cls, fname):
 
-				# determine what kind of edges we have
-				fst = f.readline().strip()
-				match = graph.pattern.search(fst)
+		# prints an error message and exits the program
+		def on_error_exit(msg):
+			sys.stderr.write(msg)
+			sys.exit(1)
 
-				# if it doesn't match what we are expecting, switch to the other
-				# pattern
-				if not match: graph.pattern = cls.PATTERNS[cls.UNDIRECTED]
-				names = {}
-				num = 1
-
-				graph.add_edge(*graph.parse_line(fst))
-				for line in f:
-					line = line.strip()
-					if line:
-						edge = graph.parse_line(line)
-						if edge[0].lower() not in names:
-							names[edge[0].lower()] = Node(num, edge[0])
+		# if the file does not exist, don't try reading from it
+		if os.path.isfile(fname):
+			with open(fname, 'rb') as csvfile:
+				size = int(csvfile.readline().strip())
+				graphReader = csv.DictReader(csvfile, fieldnames=cls.FIELDNAMES)
+				try:
+					graph = cls(size)
+					for row in graphReader:
+						graph.parse_row(row)
+					return graph
+				except (ValueError, SyntaxError) as e:
+					on_error_exit("%s\n" %str(e))
+		else:
+			on_error_exit("Invalid file name: %s\nThe file does not exist or is not a file\n" %fname)
 
 
-						lst = names.get(, [])
-						lst.append(components)
-						names
-						names[components[0]] = components
-
-
-
-			except (ValueError, SyntaxError) as e:
-				print (e)
 
 class WeightedGraph(Graph):
-	pattern = re.compile(r'.*?\((.+?)\)(?:->\((.+?)\)\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?))?')
+	FIELDNAMES = ['head', 'tail', 'weight']
+	EdgeTo = collections.namedtuple('EdgeTo', 'node, weight')
+
+	def parse_row(self, row):
+		n1 = row['head']
+		n2 = row['tail']
+		w = row['weight']
+		self.add_edge(int(n1), int(n2), float(w))
+
 	def add_edge(self, n1, n2, weight):
 		"""
 		The edges are given by integers
 		"""
-		# self.check_valid_node(n1.ident)
-		# self.check_valid_node(n2.ident)
+		self.check_valid(n1)
+		self.check_valid(n2)
 		
-		# self.nodes[n1] = (n2, weight)
-		pass
+		self.nodes[n1 - 1].add(WeightedGraph.EdgeTo(node=n2, weight=weight))
 
 if __name__ == '__main__':
-	g = WeightedGraph.from_file(open('somefile', 'r'))
+	g = WeightedGraph.from_csv(sys.argv[1])
+	print (g)
 
