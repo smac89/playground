@@ -28,8 +28,8 @@ class Graph(object):
 			raise ValueError("The node does not exist: %d" %index)
 
 	def parse_row(self, row):
-		n1 = row['head']
-		n2 = row['tail']
+		n1 = row['head'].strip()
+		n2 = row['tail'].strip()
 		self.add_edge(int(n1), int(n2))
 
 	def __repr__(self):
@@ -68,7 +68,7 @@ class Graph(object):
 		if os.path.isfile(fname):
 			with open(fname, 'rb') as jsonfile:
 				graph_dict = json.load(jsonfile)
-				size = int(graph_dict["size"])
+				size = int(graph_dict["size"].strip())
 				try:
 					graph = cls(size)
 					for row in graph_dict["edges"]:
@@ -80,15 +80,14 @@ class Graph(object):
 			Graph.on_error_exit("Invalid file name: %s\nThe file does not exist or is not a file\n" %fname)
 
 
-
 class WeightedGraph(Graph):
 	FIELDNAMES = ['head', 'tail', 'weight']
 	EdgeTo = collections.namedtuple('EdgeTo', 'node, weight')
 
 	def parse_row(self, row):
-		n1 = row['head']
-		n2 = row['tail']
-		w = row['weight']
+		n1 = row['head'].strip()
+		n2 = row['tail'].strip()
+		w = row['weight'].strip()
 		self.add_edge(int(n1), int(n2), float(w))
 
 	def add_edge(self, n1, n2, weight):
