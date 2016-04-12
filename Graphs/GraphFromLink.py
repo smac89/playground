@@ -18,8 +18,8 @@ class Graph(object):
 		"""
 		Add an edge between n1 and n2
 		"""
-		self.check_valid_node(n1)
-		self.check_valid_node(n2)
+		self.check_valid(n1)
+		self.check_valid(n2)
 		
 		self.nodes[n1 - 1].add(n2)
 
@@ -28,8 +28,8 @@ class Graph(object):
 			raise ValueError("The node does not exist: %d" %index)
 
 	def parse_row(self, row):
-		n1 = row['head'].strip()
-		n2 = row['tail'].strip()
+		n1 = row['head']
+		n2 = row['tail']
 		self.add_edge(int(n1), int(n2))
 
 	def __repr__(self):
@@ -68,7 +68,7 @@ class Graph(object):
 		if os.path.isfile(fname):
 			with open(fname, 'rb') as jsonfile:
 				graph_dict = json.load(jsonfile)
-				size = int(graph_dict["size"].strip())
+				size = int(graph_dict["size"])
 				try:
 					graph = cls(size)
 					for row in graph_dict["edges"]:
@@ -85,9 +85,9 @@ class WeightedGraph(Graph):
 	EdgeTo = collections.namedtuple('EdgeTo', 'node, weight')
 
 	def parse_row(self, row):
-		n1 = row['head'].strip()
-		n2 = row['tail'].strip()
-		w = row['weight'].strip()
+		n1 = row['head']
+		n2 = row['tail']
+		w = row['weight']
 		self.add_edge(int(n1), int(n2), float(w))
 
 	def add_edge(self, n1, n2, weight):
@@ -99,7 +99,26 @@ class WeightedGraph(Graph):
 		
 		self.nodes[n1 - 1].add(WeightedGraph.EdgeTo(node=n2, weight=weight))
 
+
+class MultiGraph(Graph):
+	def __init__(self, size):
+		if size <= 0:
+			raise ValueError("The size of the graph has to be greater than 0")
+		self.nodes = [dict() for _ in range(size)]
+		self.size = size
+
+	def add_edge(self, n1, n2):
+		"""
+		Add an edge between n1 and n2
+		"""
+		self.check_valid(n1)
+		self.check_valid(n2)
+		
+		if not self.nodes[n1 - 1].get(n2):
+			self.nodes[n1 - 1][n2] = 0
+		self.nodes[n1 - 1][n2] += 1
+
 if __name__ == '__main__':
-	g = WeightedGraph.from_json(sys.argv[1])
+	g = MultiGraph.from_json(sys.argv[1])
 	print (g)
 
