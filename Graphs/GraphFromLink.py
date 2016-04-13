@@ -6,14 +6,36 @@ import json
 import collections
 
 class Graph(object):
+    """The base class for all graphs
+    Attributes:
+        nodes (list): A list that contains the edges between nodes
+        size (int): The number of nodes in the graph
+        graphtype (int): The type of links between the nodes (directed vs undirected)
+
+        FIELDNAMES (list): The names of the columns in the csv file. Useful for reading
+            the graph from a csv file
+        DIRECTED (int): Number which implies that the graph has directed edges
+        UNDIRECTED (int): Number which implies that the graph has undirected edges
+
+    """
+
     FIELDNAMES = ['head', 'tail']
-    DIRECTED = 1
-    UNDIRECTED = 2
+    UNDIRECTED, DIRECTED = range(2)
     __slots__ = ['nodes', 'size', 'graphtype']
 
     def __init__(self, size, graphtype):
+        """ Constructor for a graph
+
+        Args:
+            size (int): The number of nodes in the graph
+            graphtype (int): The type of links between the nodes (directed vs undirected)
+        """
         if size <= 0:
             raise ValueError("The size of the graph has to be greater than 0")
+        if graphtype not in (Graph.DIRECTED, Graph.UNDIRECTED):
+            raise ValueError("Unknown graph type given. Must be one of (DIRECTED: %d, UNDIRECTED %d"
+                %(Graph.DIRECTED, Graph.UNDIRECTED))    
+
         self.nodes = [set() for _ in range(size + 1)]
         self.size = size
         self.graphtype = graphtype
@@ -26,7 +48,7 @@ class Graph(object):
         self.check_valid(n2)
         
         self.nodes[n1].add(n2)
-        if self.graphtype == Graph.UNDIRECTED
+        if self.graphtype == Graph.UNDIRECTED:
             self.nodes[n2].add(n1)
 
     def has_edge(self, n1, n2):
@@ -41,6 +63,13 @@ class Graph(object):
         self.check_valid(n1)
         self.check_valid(n2)
         return n2 in self.nodes[n1]
+
+    def get_edges(self):
+        """
+        Returns:
+            list: The list of edges in the graph
+        """
+        return [Graph.Edge(fromnode=u, tonode=v) for u in range(1, self.size + 1) for v in self.nodes[u]]
 
     def check_valid(self, index):
         """
@@ -58,10 +87,10 @@ class Graph(object):
         Args:
             row (dict): A dictionary containing an edge in the graph
         """
-        n1 = row['head']
-        n2 = row['tail']
+        n1 = int(row['head'])
+        n2 = int(row['tail'])
         if not self.has_edge(n1, n2):
-            self.add_edge(int(n1), int(n2))
+            self.add_edge(n1, n2)
 
     def __repr__(self):
         return "%d\n%s\n" %(self.size, "\n".join("%d -> %d" %(n, len(self.nodes[n])) for n in range(1, self.size + 1)))
@@ -126,20 +155,17 @@ class Graph(object):
             tonode (int): The node which this edge ends at
         """
 
-        __slots__ = ()
-
         def __hash__(self):
             return hash((self.fromnode, self.tonode))
 
         def __eq__(self, other):
             if type(self) == type(other):
-                return self.__dict__ == other.__dict__
+                return (self.fromnode, self.tonode) == (other.fromnode, other.tonode)
             return False
 
 
 class WeightedGraph(Graph):
     FIELDNAMES = ['head', 'tail', 'weight']
-    EdgeTo = collections.namedtuple('EdgeTo', 'node, weight')
 
     def parse_row(self, row):
         n1 = row['head']
@@ -153,35 +179,75 @@ class WeightedGraph(Graph):
         """
         self.check_valid(n1)
         self.check_valid(n2)
-        
-        self.nodes[n1].add(WeightedGraph.EdgeTo(node=n2, weight=weight))
+         
+        self.nodes[n1].add(WeightedGraph.WeightedEdge(weight, fromnode=n1, tonode=n2))
+        if self.graphtype == Graph.UNDIRECTED:
+            self.nodes[n2].add(WeightedGraph.WeightedEdge(weight, fromnode=n2, tonode=n1))
 
-    
+    def get_edges(self):
+        """
+        Returns:
+            list: The list of edges in the graph
+        """
+        return [edge for u in range(1, self.size + 1) for edge in self.nodes[u]]
+
+    def has_edge(self, n1, n2):
+        """
+        Args:
+            n1 (int): The id of the first vertex
+            n2 (int): The id of the second vertex
+
+        Returns:
+            bool: True if n1 has an edge to n2
+        """
+        self.check_valid(n1)
+        self.check_valid(n2)
+        return WeightedGraph.WeightedEdge(-1, fromnode=n1, tonode=n2) in self.nodes[n1]
+
+    class WeightedEdge(Graph.Edge):
+        # __slots__ = ('weight',)
+        def __new__(cls, weight, **kwargs):
+            self = super(WeightedGraph.WeightedEdge, cls).__new__(cls, **kwargs)
+            self.weight = weight
+            return self
 
 
 class MultiGraph(Graph):
 
-    def __init__(self, size):
-        super(MultiGraph, self).__init__(size)
-        self.edgeList = []
-
+    def __init__(self, size, graphtype):
+        super(MultiGraph, self).__init__(size, graphtype)
+        self.edgeList = dict()
 
     def add_edge(self, n1, n2):
         """
         Add an edge between n1 and n2
         """
+        super(MultiGraph, self).add_edge(n1, n2)
+        
+        edge = Graph.Edge(fromnode=n1, tonode=n2)
+        self.edgeList[edge] = 1
+        if self.graphtype == Graph.UNDIRECTED:
+            self.edgeList[edge] += 1
+
+    def get_edges(self):
+        """
+        Returns:
+            list: The list of edges in the graph
+        """
+        return [edge for (edge, count) in self.edgeList.items() for _ in range(count)]
+
+    def has_edge(self, n1, n2):
+        """
+        Args:
+            n1 (int): The id of the first vertex
+            n2 (int): The id of the second vertex
+
+        Returns:
+            bool: True if n1 has an edge to n2
+        """
         self.check_valid(n1)
         self.check_valid(n2)
-        
-        edge = MultiGraph.Edge(fromnode=n1, tonode=n2)
-        self.edgeList.a(edge)
-        self.
-        if not self.nodes[n1].get(n2):
-            self.nodes[n1][n2] = 0
-        self.nodes[n1][n2] += 1
-
-        g = 
-
+        return Graph.Edge(fromnode=n1, tonode=n2) in self.edgeList
 
 if __name__ == '__main__':
     g = MultiGraph.from_json(sys.argv[1])
