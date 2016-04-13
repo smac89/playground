@@ -7,7 +7,17 @@ import json
 import collections
 from GraphFromLink import Graph, WeightedGraph, MultiGraph
 
+class TestWithGraph(object):
+    def __init__(self, graphclass):
+        self.graphclass = graphclass
+    def __call__(self, cls):
+        cls.GraphClass = property(lambda clself: self.graphclass)
+        return cls
+
+@TestWithGraph(Graph)
 class GraphTestCase(unittest.TestCase):
+    __metaclass__ = TestWithGraph
+
     NUM_NODES_IN_GRAPH = 5
     NUM_EDGES_UNDIR = 10
     NUM_EDGES_DIR = 8
@@ -15,7 +25,7 @@ class GraphTestCase(unittest.TestCase):
 
     def test_1_should_raise_init(self):
         with self.assertRaises(ValueError):
-            graph = Graph(0, Graph.DIRECTED)
+            graph = self.GraphClass(0, Graph.DIRECTED)
 
     def test_2_edge_iscorrect(self):
         edges = self.graph_d.get_edges()
@@ -72,7 +82,6 @@ class GraphTestCase(unittest.TestCase):
         
 
     def setUp(self):
-        self.GraphClass = self.get_graph_class()
         self.graph_d = self.GraphClass(GraphTestCase.NUM_NODES_IN_GRAPH, Graph.DIRECTED)
         self.graph_u = self.GraphClass(GraphTestCase.NUM_NODES_IN_GRAPH, Graph.UNDIRECTED)
         self.numedge_d = GraphTestCase.NUM_EDGES_DIR
@@ -109,9 +118,6 @@ class GraphTestCase(unittest.TestCase):
         graph.add_edge(n1, n2)
         return (n1, n2)
 
-    def get_graph_class(self):
-        return Graph
-
     @classmethod
     def tearDownClass(cls):
         prefix = datetime.datetime.today().strftime("%a %b %d")
@@ -139,6 +145,7 @@ class GraphTestCase(unittest.TestCase):
             test_csv.write(some_string)
 
 
+@TestWithGraph(WeightedGraph)
 class WeightedGraphTestCase(GraphTestCase):
     def get_json_data(self):
         json_data = {
@@ -152,28 +159,24 @@ class WeightedGraphTestCase(GraphTestCase):
                 {"head": 2, "tail": 7, "weight": 10}
             ]
         }
-        return GraphTestCase.TestData(data=json_data, nodes=8, edges=5, directed=True)
+        return WeightedGraphTestCase.TestData(data=json_data, nodes=8, edges=5, directed=True)
 
     def get_csv_data(self):
         csv_input = "8\ntrue\n1,5,10\n6,2,15\n3,4,10\n5,8,50\n2,7,10"
-        return GraphTestCase.TestData(data=csv_input, nodes=8, edges=5, directed=True)
-
-    def get_graph_class(self):
-        return WeightedGraph
+        return WeightedGraphTestCase.TestData(data=csv_input, nodes=8, edges=5, directed=True)
 
     def add_edge_to_graph(cls, graph):
-        n1, n2 = GraphTestCase.random_edge(graph)
+        n1, n2 = WeightedGraphTestCase.random_edge(graph)
         while graph.has_edge(n1, n2):
-            n1, n2 = GraphTestCase.random_edge(graph)
+            n1, n2 = WeightedGraphTestCase.random_edge(graph)
         weight = random.random() * int('F4CE',16)
         graph.add_edge(n1, n2, weight)
         return (n1, n2, weight)
 
 
+@TestWithGraph(MultiGraph)
 class MultiGraphTestCase(GraphTestCase):
-    def get_graph_class(self):
-        return MultiGraph
-
+    pass
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(GraphTestCase)
