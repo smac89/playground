@@ -7,6 +7,7 @@ import collections
 
 class Graph(object):
     """The base class for all graphs
+
     Attributes:
         nodes (list): A list that contains the edges between nodes
         size (int): The number of nodes in the graph
@@ -41,8 +42,13 @@ class Graph(object):
         self.graphtype = graphtype
 
     def add_edge(self, n1, n2):
-        """
-        Add an edge between n1 and n2
+        """Add an edge between n1 and n2
+
+        Args:
+            n1 (int): The id of the first part of the edge. In a directed graph this will be the vertex from which
+            the edge leaves
+            n2 (int): The id of the second part of the edge. In a directed graph, this will be the vertex that the edge
+            goes to
         """
         self.check_valid(n1)
         self.check_valid(n2)
@@ -89,8 +95,7 @@ class Graph(object):
         """
         n1 = int(row['head'])
         n2 = int(row['tail'])
-        if not self.has_edge(n1, n2):
-            self.add_edge(n1, n2)
+        self.add_edge(n1, n2)
 
     def __repr__(self):
         return "%d\n%s\n" %(self.size, "\n".join("%d -> %d" %(n, len(self.edges[n])) for n in range(1, self.size + 1)))
@@ -105,8 +110,13 @@ class Graph(object):
 
     @classmethod
     def from_csv(cls, fname):
+        """Attemps to create a graph from a csv file
+        Args:
+            fname (str): The name of the file to read the graph from
 
-        # if the file does not exist, don't try reading from it
+        Returns:
+            graph (cls): A graph of type cls
+        """
         if os.path.isfile(fname):
             with open(fname, 'r') as csvfile:
                 size = int(csvfile.readline().strip())
@@ -128,8 +138,13 @@ class Graph(object):
 
     @classmethod
     def from_json(cls, fname):
+        """Attemps to create a graph from a json file
+        Args:
+            fname (str): The name of the file to read the graph from
 
-        # if the file does not exist, don't try reading from it
+        Returns:
+            graph (cls): A graph of type cls
+        """
         if os.path.isfile(fname):
             with open(fname, 'r') as jsonfile:
                 graph_dict = json.load(jsonfile)
@@ -219,18 +234,9 @@ class MultiGraph(Graph):
         super(MultiGraph, self).__init__(size, graphtype)
         self.edges = [dict() for _ in range(size + 1)]
 
-    def parse_row(self, row):
-        """
-        Args:
-            row (dict): A dictionary containing an edge in the graph
-        """
-        n1 = int(row['head'])
-        n2 = int(row['tail'])
-        self.add_edge(n1, n2)
 
     def add_edge(self, n1, n2):
-        """
-        Add an edge between n1 and n2
+        """Adds an edge between n1 and n2
         """
 
         n = self.edges[n1].get(n2, 0) + 1
