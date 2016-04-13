@@ -111,10 +111,9 @@ class Graph(object):
             with open(fname, 'r') as csvfile:
                 size = int(csvfile.readline().strip())
 
-                graphtype = cls.UNDIRECTED
                 direct = re.match(r"(false|true)", csvfile.readline().strip(), re.I)
-                if direct and direct.group(0).lower() == "true":
-                    graphtype = cls.DIRECTED
+
+                graphtype = cls.DIRECTED if direct and direct.group(0).lower() == "true" else cls.UNDIRECTED
 
                 graph_reader = csv.DictReader(csvfile, fieldnames=cls.FIELDNAMES)
                 try:
@@ -135,7 +134,7 @@ class Graph(object):
             with open(fname, 'r') as jsonfile:
                 graph_dict = json.load(jsonfile)
                 size = int(graph_dict["size"])
-                graphtype = graph_dict["directed"]
+                graphtype = cls.DIRECTED if graph_dict["directed"] else cls.UNDIRECTED
                 try:
                     graph = cls(size, graphtype)
                     for row in graph_dict["edges"]:
@@ -220,18 +219,25 @@ class MultiGraph(Graph):
         super(MultiGraph, self).__init__(size, graphtype)
         self.edges = [dict() for _ in range(size + 1)]
 
+    def parse_row(self, row):
+        """
+        Args:
+            row (dict): A dictionary containing an edge in the graph
+        """
+        n1 = int(row['head'])
+        n2 = int(row['tail'])
+        self.add_edge(n1, n2)
+
     def add_edge(self, n1, n2):
         """
         Add an edge between n1 and n2
         """
 
-        edge = (n1, n2)
-        n = self.edges[n1].get(edge, 0) + 1
-        self.edges[n1][edge] = n
+        n = self.edges[n1].get(n2, 0) + 1
+        self.edges[n1][n2] = n
         if self.graphtype == Graph.UNDIRECTED:
-            edge = (n2, n1)
-            n = self.edges[n2].get(edge, 0) + 1
-            self.edges[n2][edge] = n
+            n = self.edges[n2].get(n1, 0) + 1
+            self.edges[n2][n1] = n
 
     def get_edges(self):
         """
@@ -252,7 +258,7 @@ class MultiGraph(Graph):
         """
         self.check_valid(n1)
         self.check_valid(n2)
-        return (n1, n2) in self.edges[n1]
+        return n2 in self.edges[n1]
 
 if __name__ == '__main__':
     g = MultiGraph.from_json(sys.argv[1])

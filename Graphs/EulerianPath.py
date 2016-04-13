@@ -1,7 +1,7 @@
-from GraphFromLink import MultiGraph
 import sys
 import random
 import copy
+from GraphFromLink import MultiGraph
 
 class EulerianPath(object):
 	def __init__(self, graph):
@@ -10,24 +10,38 @@ class EulerianPath(object):
 	def find_eulerian_path(self):
 
 		def findPath(fr, to, pathlist):
-			pathlist.append(to)
-			for w in self.graph.nodes[to]:
-				if visited[to][w] > 0 and w != fr:
-					visited[to][w] -= 1
-					findPath(fr, w, pathlist)
-				elif w == fr:
+			for (v, c) in self.graph.edges[to].items():
+				if visited[(to, v)] > 0 and visited[(to, v)] == prev_visited[(to, v)] and v != fr:
+					visited[(to, v)] -= 1
+					if self.graph.graphtype == MultiGraph.UNDIRECTED:
+						visited[(v, to)] -= 1
+					findPath(fr, v, pathlist)
+					if pathlist:
+						pathlist.append(v)
+						break
+				elif visited[(to, v)] > 0 and v == fr:
 					pathlist.append(fr)
 					break
 			return pathlist
 
-		# start from any point
-		start = random.randint(1, self.graph.size)
+		unused = set(range(1, self.graph.size + 1))
+		visited = {(u, v): count for (u, dedge) in enumerate(self.graph.edges) for (v, count) in dedge.items()}
+		pathlist = []
 
-		visited = copy.deepcopy(self.graph.nodes)
+		start = unused.pop()
 
-		path_exists = True
+		while True:
+			prev_visited = copy.deepcopy(visited)
+			path = findPath(start, start, [])
+			if len(path) > 1:
+				if pathlist.count(start) > 0:
+					ind = pathlist.index(start)
+					pathlist = pathlist[:ind] + path + pathlist[ind + 1:]
+				else: pathlist.extend(path)
+			elif not unused: break
+			start = unused.pop()
 
-		return findPath(start, start, [])
+		return pathlist
 
 if __name__ == '__main__':
 	graph = MultiGraph.from_json(sys.argv[1])
