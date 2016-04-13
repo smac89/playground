@@ -21,7 +21,7 @@ class Graph(object):
 
     FIELDNAMES = ['head', 'tail']
     UNDIRECTED, DIRECTED = range(2)
-    __slots__ = ['nodes', 'size', 'graphtype']
+    __slots__ = ['edges', 'size', 'graphtype']
 
     def __init__(self, size, graphtype):
         """ Constructor for a graph
@@ -36,7 +36,7 @@ class Graph(object):
             raise ValueError("Unknown graph type given. Must be one of (DIRECTED: %d, UNDIRECTED %d"
                 %(Graph.DIRECTED, Graph.UNDIRECTED))    
 
-        self.nodes = [set() for _ in range(size + 1)]
+        self.edges = [set() for _ in range(size + 1)]
         self.size = size
         self.graphtype = graphtype
 
@@ -47,9 +47,9 @@ class Graph(object):
         self.check_valid(n1)
         self.check_valid(n2)
         
-        self.nodes[n1].add(n2)
+        self.edges[n1].add(n2)
         if self.graphtype == Graph.UNDIRECTED:
-            self.nodes[n2].add(n1)
+            self.edges[n2].add(n1)
 
     def has_edge(self, n1, n2):
         """
@@ -62,14 +62,14 @@ class Graph(object):
         """
         self.check_valid(n1)
         self.check_valid(n2)
-        return n2 in self.nodes[n1]
+        return n2 in self.edges[n1]
 
     def get_edges(self):
         """
         Returns:
             list: The list of edges in the graph
         """
-        return [Graph.Edge(fromnode=u, tonode=v) for u in range(1, self.size + 1) for v in self.nodes[u]]
+        return [Graph.Edge(fromnode=u, tonode=v) for u in range(1, self.size + 1) for v in self.edges[u]]
 
     def check_valid(self, index):
         """
@@ -93,10 +93,10 @@ class Graph(object):
             self.add_edge(n1, n2)
 
     def __repr__(self):
-        return "%d\n%s\n" %(self.size, "\n".join("%d -> %d" %(n, len(self.nodes[n])) for n in range(1, self.size + 1)))
+        return "%d\n%s\n" %(self.size, "\n".join("%d -> %d" %(n, len(self.edges[n])) for n in range(1, self.size + 1)))
 
     def __str__(self):
-        return "%d\n%s\n" %(self.size, "\n".join("%d -> %s" %(n, str(self.nodes[n])) for n in range(1, self.size + 1)))
+        return "%d\n%s\n" %(self.size, "\n".join("%d -> %s" %(n, str(self.edges[n])) for n in range(1, self.size + 1)))
 
     @staticmethod
     def on_error_exit(msg):
@@ -161,6 +161,8 @@ class Graph(object):
         def __eq__(self, other):
             if type(self) == type(other):
                 return (self.fromnode, self.tonode) == (other.fromnode, other.tonode)
+            elif tuple == type(other):
+                return (self.fromnode, self.tonode) == other
             return False
 
 
@@ -180,16 +182,16 @@ class WeightedGraph(Graph):
         self.check_valid(n1)
         self.check_valid(n2)
          
-        self.nodes[n1].add(WeightedGraph.WeightedEdge(weight, fromnode=n1, tonode=n2))
+        self.edges[n1].add(WeightedGraph.WeightedEdge(weight, fromnode=n1, tonode=n2))
         if self.graphtype == Graph.UNDIRECTED:
-            self.nodes[n2].add(WeightedGraph.WeightedEdge(weight, fromnode=n2, tonode=n1))
+            self.edges[n2].add(WeightedGraph.WeightedEdge(weight, fromnode=n2, tonode=n1))
 
     def get_edges(self):
         """
         Returns:
             list: The list of edges in the graph
         """
-        return [edge for u in range(1, self.size + 1) for edge in self.nodes[u]]
+        return [edge for u in range(1, self.size + 1) for edge in self.edges[u]]
 
     def has_edge(self, n1, n2):
         """
@@ -202,7 +204,7 @@ class WeightedGraph(Graph):
         """
         self.check_valid(n1)
         self.check_valid(n2)
-        return WeightedGraph.WeightedEdge(-1, fromnode=n1, tonode=n2) in self.nodes[n1]
+        return (n1, n2) in self.edges[n1]
 
     class WeightedEdge(Graph.Edge):
         # __slots__ = ('weight',)
@@ -216,25 +218,28 @@ class MultiGraph(Graph):
 
     def __init__(self, size, graphtype):
         super(MultiGraph, self).__init__(size, graphtype)
-        self.edgeList = dict()
+        self.edges = [dict() for _ in range(size + 1)]
 
     def add_edge(self, n1, n2):
         """
         Add an edge between n1 and n2
         """
-        super(MultiGraph, self).add_edge(n1, n2)
-        
-        edge = Graph.Edge(fromnode=n1, tonode=n2)
-        self.edgeList[edge] = 1
+
+        edge = (n1, n2)
+        n = self.edges[n1].get(edge, 0) + 1
+        self.edges[n1][edge] = n
         if self.graphtype == Graph.UNDIRECTED:
-            self.edgeList[edge] += 1
+            edge = (n2, n1)
+            n = self.edges[n2].get(edge, 0) + 1
+            self.edges[n2][edge] = n
 
     def get_edges(self):
         """
         Returns:
             list: The list of edges in the graph
         """
-        return [edge for (edge, count) in self.edgeList.items() for _ in range(count)]
+        edges = [edge for edgecount in self.edges for (edge, count) in edgecount.items() for _ in range(count)]
+        return edges
 
     def has_edge(self, n1, n2):
         """
@@ -247,7 +252,7 @@ class MultiGraph(Graph):
         """
         self.check_valid(n1)
         self.check_valid(n2)
-        return Graph.Edge(fromnode=n1, tonode=n2) in self.edgeList
+        return (n1, n2) in self.edges[n1]
 
 if __name__ == '__main__':
     g = MultiGraph.from_json(sys.argv[1])

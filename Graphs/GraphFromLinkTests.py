@@ -11,7 +11,7 @@ class TestWithGraph(object):
     def __init__(self, graphclass):
         self.graphclass = graphclass
     def __call__(self, cls):
-        cls.GraphClass = property(lambda clself: self.graphclass)
+        cls.GraphClass = property(lambda _: self.graphclass)
         return cls
 
 @TestWithGraph(Graph)
