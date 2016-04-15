@@ -60,7 +60,6 @@ def bfs(graph):
                     switchTo[node] = parent[-1] # Record how we got here
                     visited[s - 1] = 1
 
-    # print (found_cycle, switchTo, queue)
     if found_cycle:
         return "".join(c if c else 'C' for c in switchTo)
     return "impossible"
