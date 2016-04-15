@@ -4,7 +4,7 @@ import collections
 EDGE_SIZE = 3
 
 def bfs(graph):
-    """The basic idea is to work backwards from the 
+    """The basic idea is to work backwards from the
     start until we get back to the start
     """
     queue = collections.deque()
@@ -58,7 +58,7 @@ def bfs(graph):
                 if not visited[s - 1]:
                     queue.append(sc)
                     switchTo[node] = parent[-1] # Record how we got here
-                    visited[s - 1] = 1                    
+                    visited[s - 1] = 1
 
     # print (found_cycle, switchTo, queue)
     if found_cycle:
