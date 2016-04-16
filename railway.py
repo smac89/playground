@@ -11,12 +11,18 @@ def bfs(graph):
     visited = [0 for _ in xrange(len(graph))]
     switchTo = [None for _ in xrange(len(graph))]
 
+    def add_to_queue(con_str):
+        s, p = switch_conn(con_str)
+        parent, sw = switch_conn(graph[s - 1][p - 1])
+        if sw != 1 and switchTo[parent - 1] == None:
+            switchTo[parent - 1] = graph[s - 1][p - 1][-1]
+        # print "Path to %s is %s" %(sc, graph[s - 1][p - 1])
+        queue.append(con_str)
+        visited[s - 1] = 1
+
     sc = graph[0][0]
     if sc: # If this edge does not lead to a dead end
         queue.append(sc)
-        s, pos = switch_conn(sc)
-        if pos != 1: # if it doesn't lead to an A connection
-            switchTo[s - 1] = sc[-1] # Record how we got here
     found_cycle = False
 
     while queue:
@@ -31,38 +37,43 @@ def bfs(graph):
             switchTo[0] = parent[-1]
             break
 
-        s, p = switch_conn(graph[node][pos])
-        # If the train goes through a fork
-        if p != 1 and switchTo[s - 1] == None:
-            # record which fork it took
-            switchTo[s - 1] = graph[node][pos][-1]
-
         if pos == 0: # if we are at point A of a station
-            sc = graph[node][1] # Try going through point B
-            if sc: # If this edge does not lead to a dead end
-                s, _ = switch_conn(sc)
-                if not visited[s - 1]:
-                    queue.append(sc)
-                    visited[s - 1] = 1
+            did_visit = False
+            for i in (1,2):
+                sc = graph[node][i] # Try going through a point
+                if sc: # If this edge does not lead to a dead end
+                    s, _ = switch_conn(sc)
+                    if not visited[s - 1]:
+                        did_visit = True
+                        add_to_queue(sc)
+            if not did_visit:
+                sc = graph[node][0] # Try going through a point
+                if sc: # If this edge does not lead to a dead end
+                    s, _ = switch_conn(sc)
+                    if not visited[s - 1]:
+                        add_to_queue(sc)
+                        switchTo[node] = parent[-1] # Record how we got here
 
-            sc = graph[node][2] # Try going through point C
-            if sc: # If this edge does not lead to a dead end
-                s, _ = switch_conn(sc)
-                if visited[s - 1] != 2:
-                    queue.append(sc)
-                    visited[s - 1] = 1
         else: # We are at point B or C which means only one way to go from here
+            did_visit = False
             sc = graph[node][0]
             if sc: # If this edge does not lead to a dead end
-                s, _ = switch_conn(sc)
+                s, p = switch_conn(sc)
                 if not visited[s - 1]:
-                    queue.append(sc)
+                    did_visit = True
+                    add_to_queue(sc)
                     switchTo[node] = parent[-1] # Record how we got here
-                    visited[s - 1] = 1
+
+            if not did_visit:
+                sc = graph[node][pos] # Try going through a point
+                if sc: # If this edge does not lead to a dead end
+                    s, _ = switch_conn(sc)
+                    if not visited[s - 1]:
+                        add_to_queue(sc)
 
     if found_cycle:
         return "".join(c if c else 'C' for c in switchTo)
-    return "impossible"
+    return "Impossible"
 
 def make_edge(graph, start, end):
     switch_s, cp_s = switch_conn(start)
