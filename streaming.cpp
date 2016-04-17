@@ -11,18 +11,19 @@ using ull = unsigned long long;
 
 struct LogEntry {
     unsigned long long endtime, starttime;
-    int bitrate;
+    unsigned int bitrate;
     double streamed, duration;
 };
 
 using LogSet = std::set<LogEntry, bool (*) (const LogEntry&, const LogEntry&)>;
 using LogEntries = std::vector<LogEntry>;
-using CountEntry = LogEntries::size_type;
-using StartGroup = std::list<std::pair<ull, CountEntry>>;
+using LSize = LogEntries::size_type;
 
-void reorder(LogEntries&, StartGroup&);
-StartGroup get_start_times(LogEntries&);
+void reorder(LogEntries&);
+void combine_range(LogEntries&, LogSet&, LSize, LSize);
 std::istream &operator >> (std::istream&, LogEntry&);
+inline bool order_by_start (const LogEntry&, const LogEntry&);
+inline bool order_by_end (const LogEntry&, const LogEntry&);
 
 #ifdef DEBUG
 std::ostream &operator << (std::ostream&, const LogEntry&);
@@ -31,101 +32,109 @@ template <typename F, typename S>
 std::ostream &operator << (std::ostream&, const std::pair<F, S>&);
 #endif
 
+
 int main() {
 
     LogEntries logEntries;
-    CountEntry logsize;
+    LSize logsize;
     std::cin >> logsize;
-
-    // LogSet entries([](const LogEntry& lhs, const LogEntry& rhs) {
-    //         return lhs.starttime < rhs.starttime;
-    // });
 
     std::copy_n(std::istream_iterator<LogEntry>(std::cin), logsize,
         std::back_inserter(logEntries));
 
     // sort the entries based on start times
-    std::sort(logEntries.begin(), logEntries.end(),
-        [](const LogEntry& lhs, const LogEntry& rhs) {
-            return lhs.starttime < rhs.starttime;
-    });
+    std::sort(logEntries.begin(), logEntries.end(), order_by_start);
 
-    StartGroup startTimes = get_start_times(logEntries);
+    reorder(logEntries);
 
-    for (auto& ent : logEntries) {
-        std::cout << ent << '\n';
-    }
-
-    std::cout << "\n\n";
-
-    for (auto& p : startTimes) {
-        std::cout << p << '\n';
-    }
-
-    // reorder(logEntries, startTimes);
+    // for (auto& ent : logEntries) {
+    //     std::cout << ent << '\n';
+    // }
     return 0;
 }
 
-void reorder(LogEntries &entries, StartGroup &startTimes) {
-    auto order_by_end = [](const LogEntry& lhs, const LogEntry& rhs) {
-        return lhs.endtime < rhs.endtime;
-    };
+void reorder(LogEntries &entries) {
+    LogSet set(order_by_start);
 
-    ull start = startTimes.front().first;
-    CountEntry countbeg = 0, countend = startTimes.front().second;
-    startTimes.pop_front();
+    for (LogEntries::iterator iter; entries.size() > 0; ) {
+        LSize beg = 0, c = 0, size = entries.size();
 
-    while (!startTimes.empty()) {
-        ull next_start = startTimes.front().first;
+        while (entries[c++].starttime == entries[beg].starttime &&
+            c < size) {}
 
-        std::sort(entries.begin() + countbeg, entries.begin() + countend, order_by_end);
-
-        LogEntry &l = entries[countbeg];
-        if (l.endtime <= next_start) {
-            for (countbeg++; countbeg < countend; countbeg++) {
-
-                LogEntry& next_log = entries[countbeg];
-                l.bitrate += next_log.bitrate;
-
-                // next_log.
+        // std::cout << entries.size() << std::endl;
+        std::sort(entries.begin(), entries.begin() + c, order_by_end);
+        combine_range(entries, set, beg, c);
+        iter = entries.begin();
+        for (LogEntries::iterator rem = iter + 1; rem < entries.begin() + c; rem++) {
+            if (rem->duration > 0) {
+                entries.erase(iter, rem);
+                break;
             }
         }
-        
+        // std::sort(entries.begin(), entries.end(), order_by_start);
     }
-
-
-
-
-    // while (!startTimes.empty()) {
-    //     ull end = startTimes.front();
-    //     startTimes.pop_front();
-
-    //     LogEntry entry = {.endtime = end, .starttime = start};
-
-    // }
 }
 
-StartGroup get_start_times(LogEntries& entries) {
-    // get the unique start times of all the entries along with the number
-    // of elements with the same start time
-    StartGroup startTimes;
-    ull curr = entries[0].starttime, next;
-    CountEntry count = 0, i = 1;
+void combine_range(LogEntries& entries, LogSet& set, LSize beg, LSize end) {
+    LSize size = entries.size();
+    LogEntry &l = entries[beg];
+    if (end < size && l.endtime <= entries[end].starttime) {
+        // For each log that starts at the same time
+        while (++beg < end) {
 
-    while (i != entries.size()) {
-        next = entries[i].starttime;
-        if (next > curr) {
-            startTimes.push_back(std::make_pair(curr, i - count));
-            count = i;
-            curr = next;
+            LogEntry& next_log = entries[beg];
+            // combine their bitrate
+            l.bitrate += next_log.bitrate;
+
+            // Shift it's end time to be the end time of shortest burst
+            next_log.starttime = l.endtime;
+            next_log.duration = next_log.endtime - next_log.starttime;
+            beg++;
         }
-        i++;
     }
+    else if (end < size) {
+        LogEntry entry;
+        {
+            entry.starttime = l.starttime;
+            entry.endtime = entries[end].starttime;
+            entry.duration = entries[end].starttime - l.starttime;
+            entry.bitrate = l.bitrate;
+        }
+        
 
-    startTimes.push_back(std::make_pair(curr, i - count));
-    return startTimes;
+        l.starttime = entry.endtime;
+
+        while (++beg < end) {
+            LogEntry& next_log = entries[beg];
+            entry.bitrate += next_log.bitrate;
+
+            // combine their bitrate
+            l.bitrate += next_log.bitrate;
+
+            // Shift it's end time to be the end time of shortest burst
+            next_log.starttime = entry.endtime;
+            next_log.duration = next_log.endtime - next_log.starttime;
+            beg++;
+        }
+
+        set.insert(entry);
+    }
+    set.insert(l);
+
+    while (entries[c++].starttime == entries[beg].starttime &&
+            c < size) {}
+
+    // Recursively call this method
 }
 
+bool order_by_start (const LogEntry& lhs, const LogEntry& rhs) {
+    return lhs.starttime < rhs.starttime;
+}
+
+bool order_by_end (const LogEntry& lhs, const LogEntry& rhs) {
+    return lhs.endtime < rhs.endtime;
+}
 
 std::istream &operator >> (std::istream& iss, LogEntry& entry) {
     iss >> entry.endtime >> entry.duration >> entry.bitrate;
