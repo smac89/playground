@@ -1,29 +1,38 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
-#include <list>
+#include <tuple>
 #include <set>
 #include <vector>
 #include <utility>
 #include <iomanip>
+#include <type_traits>
 
 using ull = unsigned long long;
 
-struct LogEntry {
+class LogEntry {
+public:
     unsigned long long endtime, starttime;
     unsigned int bitrate;
     double streamed, duration;
+
+    explicit LogEntry() = default;
+
+    template <typename T1, typename T2,
+    typename = std::enable_if<std::is_integral<T1>::value && std::is_integral<T2>::value>>
+    LogEntry(const std::pair<T1, T2> &val) {
+        this->starttime = val.first;
+        this->endtime = val.second;
+        this->bitrate = this->streamed = this->duration = 0;
+    }
 };
 
 using LogSet = std::set<LogEntry, bool (*) (const LogEntry&, const LogEntry&)>;
 using LogEntries = std::vector<LogEntry>;
-using LSize = LogEntries::size_type;
 
 void reorder(LogEntries&);
-void combine_range(LogEntries&, LogSet&, LSize, LSize);
+std::vector<std::pair<ull, ull>> extract_ranges(LogEntries&);
 std::istream &operator >> (std::istream&, LogEntry&);
-inline bool order_by_start (const LogEntry&, const LogEntry&);
-inline bool order_by_end (const LogEntry&, const LogEntry&);
 
 #ifdef DEBUG
 std::ostream &operator << (std::ostream&, const LogEntry&);
@@ -32,108 +41,81 @@ template <typename F, typename S>
 std::ostream &operator << (std::ostream&, const std::pair<F, S>&);
 #endif
 
-
 int main() {
 
     LogEntries logEntries;
-    LSize logsize;
+    int logsize;
     std::cin >> logsize;
 
     std::copy_n(std::istream_iterator<LogEntry>(std::cin), logsize,
         std::back_inserter(logEntries));
 
-    // sort the entries based on start times
-    std::sort(logEntries.begin(), logEntries.end(), order_by_start);
+    std::cout << "\n";
+    for (auto& ent : logEntries) {
+        std::cout << ent << '\n';
+    }
+    std::cout << "\n\n";
 
     reorder(logEntries);
-
-    // for (auto& ent : logEntries) {
-    //     std::cout << ent << '\n';
-    // }
     return 0;
 }
 
 void reorder(LogEntries &entries) {
     LogSet set(order_by_start);
 
-    for (LogEntries::iterator iter; entries.size() > 0; ) {
-        LSize beg = 0, c = 0, size = entries.size();
+    std::vector<std::pair<ull, ull>> ranges = extract_ranges(entries);
+    std::vector<std::pair<ull, ull>>::iterator hi, lo;
 
-        while (entries[c++].starttime == entries[beg].starttime &&
-            c < size) {}
+    auto compare = [](const LogEntry& lhs, const LogEntry& rhs) {
+        return lhs.endtime <= rhs.starttime;
+    };
 
-        // std::cout << entries.size() << std::endl;
-        std::sort(entries.begin(), entries.begin() + c, order_by_end);
-        combine_range(entries, set, beg, c);
-        iter = entries.begin();
-        for (LogEntries::iterator rem = iter + 1; rem < entries.begin() + c; rem++) {
-            if (rem->duration > 0) {
-                entries.erase(iter, rem);
-                break;
-            }
-        }
-        // std::sort(entries.begin(), entries.end(), order_by_start);
+    for (auto &entry : entries) {
+        std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
+            entry, compare);
+
+        std::cout << entry << "\n";
+        // std::cout << *lo << "\n";
+        std::for_each(lo, hi,
+            [](const std::pair<ull, ull>& val) {
+                std::cout << val << '\n';
+            });
+        // std::copy(lo, hi,
+        //     std::ostream_iterator<std::pair<ull, ull>>(std::cout, "\n"));
+        std::cout << "\n\n";
     }
 }
 
-void combine_range(LogEntries& entries, LogSet& set, LSize beg, LSize end) {
-    LSize size = entries.size();
-    LogEntry &l = entries[beg];
-    if (end < size && l.endtime <= entries[end].starttime) {
-        // For each log that starts at the same time
-        while (++beg < end) {
+/**
+ * @brief Extract the non-overlapping ranges from the given log entries
+ * @details The method ...
+ * 
+ * @param entries The vector of log entries from which to extract non
+ * overlapping ranges from
+ * @return A vector of pairs where each pair describes a non overlapping range
+ * found in the entries in the form of (start, end) where start > end
+ */
+std::vector<std::pair<ull, ull>> extract_ranges(LogEntries& entries) {
+    // Use a set to avoid duplicates and make the entries sorted
+    std::set<ull> times;
+    std::set<ull>::const_iterator iter;
 
-            LogEntry& next_log = entries[beg];
-            // combine their bitrate
-            l.bitrate += next_log.bitrate;
+    for (int t = 0; t < entries.size(); t++) {
+        times.insert(entries[t].starttime);
+        times.insert(entries[t].endtime);
+    }
 
-            // Shift it's end time to be the end time of shortest burst
-            next_log.starttime = l.endtime;
-            next_log.duration = next_log.endtime - next_log.starttime;
-            beg++;
+    std::vector<std::pair<ull, ull>> merged;
+    std::pair<ull, ull> range;
+
+    for (iter = times.begin(); iter != times.end();) {
+        range.first = *iter++;
+        if (iter != times.end()) {
+            range.second = *iter;
+            merged.push_back(range);
         }
     }
-    else if (end < size) {
-        LogEntry entry;
-        {
-            entry.starttime = l.starttime;
-            entry.endtime = entries[end].starttime;
-            entry.duration = entries[end].starttime - l.starttime;
-            entry.bitrate = l.bitrate;
-        }
-        
-
-        l.starttime = entry.endtime;
-
-        while (++beg < end) {
-            LogEntry& next_log = entries[beg];
-            entry.bitrate += next_log.bitrate;
-
-            // combine their bitrate
-            l.bitrate += next_log.bitrate;
-
-            // Shift it's end time to be the end time of shortest burst
-            next_log.starttime = entry.endtime;
-            next_log.duration = next_log.endtime - next_log.starttime;
-            beg++;
-        }
-
-        set.insert(entry);
-    }
-    set.insert(l);
-
-    while (entries[c++].starttime == entries[beg].starttime &&
-            c < size) {}
-
-    // Recursively call this method
-}
-
-bool order_by_start (const LogEntry& lhs, const LogEntry& rhs) {
-    return lhs.starttime < rhs.starttime;
-}
-
-bool order_by_end (const LogEntry& lhs, const LogEntry& rhs) {
-    return lhs.endtime < rhs.endtime;
+    return merged;
 }
 
 std::istream &operator >> (std::istream& iss, LogEntry& entry) {
@@ -150,7 +132,6 @@ std::ostream &operator << (std::ostream& oss, const LogEntry& entry) {
 
     return oss;
 }
-
 
 template <typename F, typename S>
 std::ostream &operator << (std::ostream& oss, const std::pair<F, S> &p) {
