@@ -67,6 +67,18 @@ int main() {
     return 0;
 }
 
+/**
+ * @brief Reads time ranges and sells lambourghinis'
+ * @details The repl stands for READ-EVALUATE-PRINT-LOOP.
+ * This method in particular will read any time range given, determine which log entries
+ * fall under this time range. It will then take the streams available under this
+ * time range and print what percentage of those streams were fully contained
+ * within the range given
+ * 
+ * @param entries The collection of logs. This must have gone through the reorder
+ * function before it can be used here
+ * @param count The number of queries to expect
+ */
 void repl(const LogEntries& entries, int count) {
     ull start, end;
     LogEntries::const_iterator hi, lo;
