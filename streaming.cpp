@@ -12,26 +12,20 @@ using ull = unsigned long long;
 
 class LogEntry {
 public:
-    unsigned long long endtime, starttime;
-    unsigned int bitrate;
+    LogEntry () 
+    : endtime(0), starttime(0), bitrate(0), prev_bitrate(0), duration(0), streamed(0) {}
+
+    ull endtime, starttime;
+    unsigned int bitrate, prev_bitrate;
     double streamed, duration;
-
-    explicit LogEntry() = default;
-
-    template <typename T1, typename T2,
-    typename = std::enable_if<std::is_integral<T1>::value && std::is_integral<T2>::value>>
-    LogEntry(const std::pair<T1, T2> &val) {
-        this->starttime = val.first;
-        this->endtime = val.second;
-        this->bitrate = this->streamed = this->duration = 0;
-    }
 };
 
 using LogSet = std::set<LogEntry, bool (*) (const LogEntry&, const LogEntry&)>;
 using LogEntries = std::vector<LogEntry>;
 
-void reorder(LogEntries&);
-std::vector<std::pair<ull, ull>> extract_ranges(LogEntries&);
+LogEntries reorder(const LogEntries&);
+LogEntries extract_ranges(const LogEntries&);
+void repl(const LogEntries&, int);
 std::istream &operator >> (std::istream&, LogEntry&);
 
 #ifdef DEBUG
@@ -50,22 +44,41 @@ int main() {
     std::copy_n(std::istream_iterator<LogEntry>(std::cin), logsize,
         std::back_inserter(logEntries));
 
+    logEntries = reorder(logEntries);
+
+    #ifdef DEBUG
     std::cout << "\n";
     for (auto& ent : logEntries) {
         std::cout << ent << '\n';
     }
     std::cout << "\n\n";
+    #endif
 
-    reorder(logEntries);
+    std::cin >> logsize;
+    repl(logEntries, logsize);
+
     return 0;
 }
 
-void reorder(LogEntries &entries) {
-    LogSet set(order_by_start);
+void repl(const LogEntries& entries, int count) {
+    for (int r = 0; r < count; r++) {
 
-    std::vector<std::pair<ull, ull>> ranges = extract_ranges(entries);
-    std::vector<std::pair<ull, ull>>::iterator hi, lo;
+    }
+}
 
+/**
+ * @brief Aranges the logs into non overlapping ranges for easier usage
+ * @details The logs are taken one by one and we cut them up into smaller
+ * logs which do not overlap. By doing this, it is easier to work with ranges
+ * because you don't have to worry about anything they overlap
+ * 
+ * @param entries The initial entries we got as input
+ */
+LogEntries reorder(const LogEntries &entries) {
+    LogEntries ranges = extract_ranges(entries);
+    LogEntries::iterator hi, lo;
+
+    // Comparator for ranges
     auto compare = [](const LogEntry& lhs, const LogEntry& rhs) {
         return lhs.endtime <= rhs.starttime;
     };
@@ -74,16 +87,19 @@ void reorder(LogEntries &entries) {
         std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
             entry, compare);
 
-        std::cout << entry << "\n";
-        // std::cout << *lo << "\n";
-        std::for_each(lo, hi,
-            [](const std::pair<ull, ull>& val) {
-                std::cout << val << '\n';
-            });
-        // std::copy(lo, hi,
-        //     std::ostream_iterator<std::pair<ull, ull>>(std::cout, "\n"));
-        std::cout << "\n\n";
+        std::for_each(lo, hi, [&](LogEntry& val) {
+            val.bitrate += entry.bitrate;
+        });
     }
+
+    ranges[0].streamed = ranges[0].duration / 1000 * ranges[0].bitrate;
+
+    for (int t = 1; t < ranges.size(); t++) {
+        ranges[t].streamed = ranges[t].duration / 1000 * ranges[t].bitrate;
+        ranges[t].prev_bitrate += ranges[t - 1].bitrate;
+    }
+
+    return ranges;
 }
 
 /**
@@ -92,11 +108,10 @@ void reorder(LogEntries &entries) {
  * 
  * @param entries The vector of log entries from which to extract non
  * overlapping ranges from
- * @return A vector of pairs where each pair describes a non overlapping range
- * found in the entries in the form of (start, end) where start > end
+ * @return A vector of Log Entries where all the entries are non overlapping
  */
-std::vector<std::pair<ull, ull>> extract_ranges(LogEntries& entries) {
-    // Use a set to avoid duplicates and make the entries sorted
+LogEntries extract_ranges(const LogEntries& entries) {
+    // Use a set to avoid duplicates and make the entries sorted 2 birds one set
     std::set<ull> times;
     std::set<ull>::const_iterator iter;
 
@@ -105,13 +120,14 @@ std::vector<std::pair<ull, ull>> extract_ranges(LogEntries& entries) {
         times.insert(entries[t].endtime);
     }
 
-    std::vector<std::pair<ull, ull>> merged;
-    std::pair<ull, ull> range;
+    LogEntries merged;
+    LogEntry range;
 
     for (iter = times.begin(); iter != times.end();) {
-        range.first = *iter++;
+        range.starttime = *iter++;
         if (iter != times.end()) {
-            range.second = *iter;
+            range.endtime = *iter;
+            range.duration = range.endtime - range.starttime;
             merged.push_back(range);
         }
     }
@@ -121,7 +137,6 @@ std::vector<std::pair<ull, ull>> extract_ranges(LogEntries& entries) {
 std::istream &operator >> (std::istream& iss, LogEntry& entry) {
     iss >> entry.endtime >> entry.duration >> entry.bitrate;
     entry.starttime = entry.endtime - entry.duration;
-    entry.streamed = entry.duration / 1000 * entry.bitrate;
     return iss;
 }
 
