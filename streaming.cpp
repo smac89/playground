@@ -6,26 +6,25 @@
 #include <vector>
 #include <utility>
 #include <iomanip>
-#include <type_traits>
 
 using ull = unsigned long long;
 
 class LogEntry {
 public:
     LogEntry () 
-    : endtime(0), starttime(0), bitrate(0), prev_bitrate(0), duration(0), streamed(0) {}
+    : endtime(0), starttime(0), bitrate(0), duration(0), streamed(0), prev_streamed(0) {}
 
     ull endtime, starttime;
     unsigned int bitrate, prev_bitrate;
-    double streamed, duration;
+    double streamed, prev_streamed, duration;
 };
 
-using LogSet = std::set<LogEntry, bool (*) (const LogEntry&, const LogEntry&)>;
 using LogEntries = std::vector<LogEntry>;
 
 LogEntries reorder(const LogEntries&);
 LogEntries extract_ranges(const LogEntries&);
 void repl(const LogEntries&, int);
+bool compare(const LogEntry&, const LogEntry&);
 std::istream &operator >> (std::istream&, LogEntry&);
 
 #ifdef DEBUG
@@ -44,6 +43,14 @@ int main() {
     std::copy_n(std::istream_iterator<LogEntry>(std::cin), logsize,
         std::back_inserter(logEntries));
 
+    #ifdef DEBUG
+    std::cout << "\n";
+    for (auto& ent : logEntries) {
+        std::cout << ent << '\n';
+    }
+    std::cout << "\n\n";
+    #endif
+
     logEntries = reorder(logEntries);
 
     #ifdef DEBUG
@@ -61,8 +68,32 @@ int main() {
 }
 
 void repl(const LogEntries& entries, int count) {
-    for (int r = 0; r < count; r++) {
+    ull start, end;
+    LogEntries::const_iterator hi, lo;
+    LogEntry query;
+    std::cout.precision(3);
+    std::cout.setf(std::ios_base::fixed);
 
+    for (std::cin >> query.starttime >> query.endtime; count--; 
+        std::cin >> query.starttime >> query.endtime) {
+        std::tie(lo, hi) = std::equal_range(entries.begin(), entries.end(),
+            query, compare);
+
+        hi--;
+
+        if (query.starttime < lo->starttime) {
+            query.starttime = lo->starttime;
+        }
+
+        if (query.endtime > hi->endtime) {
+            query.endtime = hi->endtime;
+        }
+
+        query.streamed = (hi->prev_streamed - lo->prev_streamed - lo->streamed) +
+        ((lo->endtime - query.starttime) / lo->duration * lo->streamed) +
+        ((query.endtime - hi->starttime) / hi->duration * hi->streamed);
+
+        std::cout << query.streamed << '\n';
     }
 }
 
@@ -78,11 +109,6 @@ LogEntries reorder(const LogEntries &entries) {
     LogEntries ranges = extract_ranges(entries);
     LogEntries::iterator hi, lo;
 
-    // Comparator for ranges
-    auto compare = [](const LogEntry& lhs, const LogEntry& rhs) {
-        return lhs.endtime <= rhs.starttime;
-    };
-
     for (auto &entry : entries) {
         std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
             entry, compare);
@@ -96,7 +122,7 @@ LogEntries reorder(const LogEntries &entries) {
 
     for (int t = 1; t < ranges.size(); t++) {
         ranges[t].streamed = ranges[t].duration / 1000 * ranges[t].bitrate;
-        ranges[t].prev_bitrate += ranges[t - 1].bitrate;
+        ranges[t].prev_streamed = ranges[t - 1].streamed + ranges[t - 1].prev_streamed;
     }
 
     return ranges;
@@ -132,6 +158,10 @@ LogEntries extract_ranges(const LogEntries& entries) {
         }
     }
     return merged;
+}
+
+inline bool compare(const LogEntry& lhs, const LogEntry& rhs) {
+    return lhs.endtime <= rhs.starttime;
 }
 
 std::istream &operator >> (std::istream& iss, LogEntry& entry) {
