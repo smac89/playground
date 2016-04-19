@@ -6,10 +6,11 @@
 #include <vector>
 #include <utility>
 #include <iomanip>
+#include <chrono>
 // #include <bits/stdc++.h>
 
 using ull = unsigned long long;
-constexpr double CACHE_SIZE_FACTOR = 1.0 / 10 * 10 * 10; // size of the range between each cache
+constexpr double CACHE_SIZE_FACTOR = 1.0 / (10 * 10 * 10); // size of the range between each cache
 
 class LogEntry {
 public:
@@ -23,11 +24,14 @@ using LogEntries = std::vector<LogEntry>;
 using LogCache = std::vector<std::pair<const std::size_t, const std::size_t>>;
 
 LogEntries reorder(const LogEntries&, LogCache&);
-void repl(const LogEntries&, int);
+void repl(const LogEntries&, const LogCache&, int);
 bool compare(const LogEntry&, const LogEntry&);
 std::istream &operator >> (std::istream&, LogEntry&);
 
 #ifdef DEBUG
+template <typename T>
+std::ostream &operator << (std::ostream&, const std::vector<T>&);
+
 std::ostream &operator << (std::ostream&, const LogEntry&);
 
 template <typename F, typename S>
@@ -49,26 +53,23 @@ int main() {
         std::back_inserter(logEntries));
 
     #ifdef DEBUG
-    std::cout << "\n";
-    for (auto& ent : logEntries) {
-        std::cout << ent << '\n';
-    }
-    std::cout << "\n\n";
+    // std::cout << "\n" << logEntries << "\n\n";
     #endif
 
     LogCache cache;
     logEntries = reorder(logEntries, cache);
 
     #ifdef DEBUG
-    std::cout << "\n";
-    for (auto& ent : logEntries) {
-        std::cout << ent << '\n';
-    }
-    std::cout << "\n\n";
+    // std::cout << "\n" << logEntries << "\n\n";
+
+    // std::cout << "\n" << cache << "\n\n";
+    std::cout << "Entries size: " << logEntries.size() << "\nCache size: " << cache.size() << '\n';
+    std::cout << "Cache contents:\n" << cache << '\n';
     #endif
 
-    std::cin >> logsize;
-    repl(logEntries, logsize);
+    if (std::cin >> logsize) {
+        repl(logEntries, cache, logsize);
+    }
 
     return 0;
 }
@@ -85,7 +86,7 @@ int main() {
  * function before it can be used here
  * @param count The number of queries to expect
  */
-void repl(const LogEntries& entries, int count) {
+void repl(const LogEntries& entries, const LogCache& cache, int count) {
     LogEntries::const_iterator hi, lo;
     LogEntry query;
     std::cout.precision(3);
@@ -93,6 +94,7 @@ void repl(const LogEntries& entries, int count) {
 
     for (std::cin >> query.starttime >> query.endtime; count--; 
         std::cin >> query.starttime >> query.endtime) {
+        
         std::tie(lo, hi) = std::equal_range(entries.begin(), entries.end(),
             query, compare);
 
@@ -165,6 +167,12 @@ LogEntries reorder(const LogEntries &entries, LogCache& cache) {
     // The max time interval maintained within each range in the cache
     const ull max_interval = (ranges.back().endtime - ranges[0].starttime + num_buckets) / num_buckets;
 
+    #ifdef DEBUG
+    std::cout << "Cache size factor: " << CACHE_SIZE_FACTOR << '\n'
+    << "Number of buckets: " << num_buckets << '\n'
+    << "Max interval: " << max_interval << '\n';
+    #endif
+
     for (auto &entry : entries) {
         std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
             entry, compare);
@@ -176,8 +184,9 @@ LogEntries reorder(const LogEntries &entries, LogCache& cache) {
 
     LogEntries::iterator beg = ranges.begin(), curr;
     beg->streamed = beg->duration / 1000 * beg->bitrate;
-
     ull start_time = beg->starttime;
+
+    // auto start = std::chrono::steady_clock::now();
 
     for (curr = beg + 1; curr != ranges.end(); curr++) {
         curr->streamed = curr->duration / 1000 * curr->bitrate;
@@ -190,6 +199,9 @@ LogEntries reorder(const LogEntries &entries, LogCache& cache) {
         }
     }
     cache.emplace_back(std::distance(ranges.begin(), beg), std::distance(ranges.begin(), curr));
+    // std::cout << "This took: "
+    // << std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count()
+    // << " seconds\n";
 
     return ranges;
 }
@@ -215,4 +227,12 @@ std::ostream &operator << (std::ostream& oss, const LogEntry& entry) {
 template <typename F, typename S>
 std::ostream &operator << (std::ostream& oss, const std::pair<F, S> &p) {
     return oss << "(First=>" << p.first << ", second=>" << p.second << ")";
+}
+
+template <typename T>
+std::ostream &operator << (std::ostream& oss, const std::vector<T>& v) {
+    for (auto& item : v) {
+        oss << item << "\n";
+    }
+    return oss;
 }
