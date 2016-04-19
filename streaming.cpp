@@ -6,23 +6,23 @@
 #include <vector>
 #include <utility>
 #include <iomanip>
+// #include <bits/stdc++.h>
 
 using ull = unsigned long long;
+constexpr double CACHE_SIZE_FACTOR = 1.0 / 10 * 10 * 10; // size of the range between each cache
 
 class LogEntry {
 public:
-    LogEntry () 
-    : endtime(0), starttime(0), bitrate(0), duration(0), streamed(0), prev_streamed(0) {}
-
+    LogEntry () : endtime(0), starttime(0), bitrate(0), streamed(0), prev_streamed(0), duration(0) {}
     ull endtime, starttime;
-    unsigned int bitrate, prev_bitrate;
+    unsigned int bitrate;
     double streamed, prev_streamed, duration;
 };
 
 using LogEntries = std::vector<LogEntry>;
+using LogCache = std::vector<std::pair<const std::size_t, const std::size_t>>;
 
-LogEntries reorder(const LogEntries&);
-LogEntries extract_ranges(const LogEntries&);
+LogEntries reorder(const LogEntries&, LogCache&);
 void repl(const LogEntries&, int);
 bool compare(const LogEntry&, const LogEntry&);
 std::istream &operator >> (std::istream&, LogEntry&);
@@ -35,6 +35,11 @@ std::ostream &operator << (std::ostream&, const std::pair<F, S>&);
 #endif
 
 int main() {
+
+    // Remove synchronization between cstdio and iostream
+    std::ios_base::sync_with_stdio(false);
+    // Prevent flushing of output stream before each io operation
+    std::cin.tie(nullptr);
 
     LogEntries logEntries;
     int logsize;
@@ -51,7 +56,8 @@ int main() {
     std::cout << "\n\n";
     #endif
 
-    logEntries = reorder(logEntries);
+    LogCache cache;
+    logEntries = reorder(logEntries, cache);
 
     #ifdef DEBUG
     std::cout << "\n";
@@ -80,7 +86,6 @@ int main() {
  * @param count The number of queries to expect
  */
 void repl(const LogEntries& entries, int count) {
-    ull start, end;
     LogEntries::const_iterator hi, lo;
     LogEntry query;
     std::cout.precision(3);
@@ -110,37 +115,6 @@ void repl(const LogEntries& entries, int count) {
 }
 
 /**
- * @brief Aranges the logs into non overlapping ranges for easier usage
- * @details The logs are taken one by one and we cut them up into smaller
- * logs which do not overlap. By doing this, it is easier to work with ranges
- * because you don't have to worry about anything they overlap
- * 
- * @param entries The initial entries we got as input
- */
-LogEntries reorder(const LogEntries &entries) {
-    LogEntries ranges = extract_ranges(entries);
-    LogEntries::iterator hi, lo;
-
-    for (auto &entry : entries) {
-        std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
-            entry, compare);
-
-        std::for_each(lo, hi, [&](LogEntry& val) {
-            val.bitrate += entry.bitrate;
-        });
-    }
-
-    ranges[0].streamed = ranges[0].duration / 1000 * ranges[0].bitrate;
-
-    for (int t = 1; t < ranges.size(); t++) {
-        ranges[t].streamed = ranges[t].duration / 1000 * ranges[t].bitrate;
-        ranges[t].prev_streamed = ranges[t - 1].streamed + ranges[t - 1].prev_streamed;
-    }
-
-    return ranges;
-}
-
-/**
  * @brief Extract the non-overlapping ranges from the given log entries
  * @details The method ...
  * 
@@ -153,7 +127,7 @@ LogEntries extract_ranges(const LogEntries& entries) {
     std::set<ull> times;
     std::set<ull>::const_iterator iter;
 
-    for (int t = 0; t < entries.size(); t++) {
+    for (std::size_t t = 0; t < entries.size(); t++) {
         times.insert(entries[t].starttime);
         times.insert(entries[t].endtime);
     }
@@ -170,6 +144,54 @@ LogEntries extract_ranges(const LogEntries& entries) {
         }
     }
     return merged;
+}
+
+/**
+ * @brief Aranges the logs into non overlapping ranges for easier usage
+ * @details The logs are taken one by one and we cut them up into smaller
+ * logs which do not overlap. By doing this, it is easier to work with ranges
+ * because you don't have to worry about anything they overlap
+ * 
+ * @param entries The initial entries we got as input
+ */
+LogEntries reorder(const LogEntries &entries, LogCache& cache) {
+    LogEntries ranges = extract_ranges(entries);
+    LogEntries::iterator hi, lo;
+
+    // compute the cache size (atleast size 1)
+    std::size_t num_buckets = static_cast<double>(ranges.size()) * CACHE_SIZE_FACTOR + 1;
+    cache.reserve(num_buckets);
+
+    // The max time interval maintained within each range in the cache
+    const ull max_interval = (ranges.back().endtime - ranges[0].starttime + num_buckets) / num_buckets;
+
+    for (auto &entry : entries) {
+        std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
+            entry, compare);
+
+        std::for_each(lo, hi, [&entry](LogEntry& val) {
+            val.bitrate += entry.bitrate;
+        });
+    }
+
+    LogEntries::iterator beg = ranges.begin(), curr;
+    beg->streamed = beg->duration / 1000 * beg->bitrate;
+
+    ull start_time = beg->starttime;
+
+    for (curr = beg + 1; curr != ranges.end(); curr++) {
+        curr->streamed = curr->duration / 1000 * curr->bitrate;
+        curr->prev_streamed = (curr - 1)->streamed + (curr - 1)->prev_streamed;
+
+        if (curr->starttime - start_time > max_interval) {
+            cache.emplace_back(std::distance(ranges.begin(), beg), std::distance(ranges.begin(), curr));
+            beg = curr;
+            start_time = curr->starttime;
+        }
+    }
+    cache.emplace_back(std::distance(ranges.begin(), beg), std::distance(ranges.begin(), curr));
+
+    return ranges;
 }
 
 inline bool compare(const LogEntry& lhs, const LogEntry& rhs) {
