@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <map>
 #include <utility>
+#include <functional>
 #include <unordered_set>
 
 using ull = unsigned long long;
@@ -86,7 +87,7 @@ void repl(const LogEntries& entries, int count) {
 
     for (std::cin >> query.starttime >> query.endtime; count--; 
         std::cin >> query.starttime >> query.endtime) {
-        
+
         std::tie(lo, hi) = std::equal_range(entries.begin(), entries.end(),
             query, compare);
 
@@ -117,16 +118,26 @@ void repl(const LogEntries& entries, int count) {
  * @param entries The initial entries we got as input
  */
 LogEntries reorder(const LogEntries &entries) {
-    std::map<ull, std::unordered_set<std::size_t>> rng_to_entries;
-    std::map<ull, std::unordered_set<std::size_t>>::const_iterator iter;
+    struct HashPair {
+        std::size_t operator()(const std::pair<std::size_t, unsigned int>& k) const {
+            return k.first;
+        }
+    };
+
+    using pair_set = std::unordered_set<std::pair<std::size_t, unsigned int>, HashPair>;
+
+    std::map<ull, pair_set> rng_to_entries;
+    std::map<ull, pair_set>::const_iterator iter;
 
     for (std::size_t v = 0; v < entries.size(); v++) {
-        rng_to_entries[entries[v].starttime].insert(v);
-        rng_to_entries[entries[v].endtime].insert(v);
+        rng_to_entries[entries[v].starttime].emplace(v, entries[v].bitrate);
+        rng_to_entries[entries[v].endtime].emplace(v, entries[v].bitrate);
     }
 
     LogEntries merged;
-    std::unordered_set<std::size_t> main_set, var_set;
+    pair_set main_set, var_set;
+
+    unsigned int curr_bitrate = 0;
 
     for (iter = rng_to_entries.begin(); ++iter != rng_to_entries.end(); ) {
         --iter;
@@ -138,14 +149,16 @@ LogEntries reorder(const LogEntries &entries) {
         // determine all entries that overlap this range
         for (auto &v : var_set) {
             if (main_set.erase(v) == 0) {
+                curr_bitrate += v.second;
                 main_set.insert(v);
+            } else {
+                curr_bitrate -= v.second;
             }
         }
 
         // set the bitrate of this range to be an aggregate of bitrate of the overlaps
-        for (auto &v : main_set) {
-            range.bitrate += entries[v].bitrate;
-        }
+        range.bitrate = curr_bitrate;
+        
         // calculate the amount streamed
         range.streamed = range.duration / 1000 * range.bitrate;
 
