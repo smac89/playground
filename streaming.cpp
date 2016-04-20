@@ -1,9 +1,11 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
-#include <set>
 #include <vector>
 #include <iomanip>
+#include <map>
+#include <utility>
+#include <unordered_set>
 
 using ull = unsigned long long;
 
@@ -16,7 +18,7 @@ struct LogEntry {
 using LogEntries = std::vector<LogEntry>;
 
 LogEntries reorder(const LogEntries&);
-void repl(LogEntries&, int);
+void repl(const LogEntries&, int);
 bool compare(const LogEntry&, const LogEntry&);
 std::istream &operator >> (std::istream&, LogEntry&);
 
@@ -47,7 +49,7 @@ int main() {
     std::cout << "\n\n";
     #endif
 
-    logEntries = reorder(logEntries);
+    logEntries = std::move(reorder(logEntries));
 
     #ifdef DEBUG
     // std::cout << "Count: " << logEntries.size() << '\n';
@@ -76,7 +78,7 @@ int main() {
  * function before it can be used here
  * @param count The number of queries to expect
  */
-void repl(LogEntries& entries, int count) {
+void repl(const LogEntries& entries, int count) {
     LogEntries::const_iterator hi, lo;
     LogEntry query;
     std::cout.precision(3);
@@ -84,6 +86,7 @@ void repl(LogEntries& entries, int count) {
 
     for (std::cin >> query.starttime >> query.endtime; count--; 
         std::cin >> query.starttime >> query.endtime) {
+        
         std::tie(lo, hi) = std::equal_range(entries.begin(), entries.end(),
             query, compare);
 
@@ -114,58 +117,41 @@ void repl(LogEntries& entries, int count) {
  * @param entries The initial entries we got as input
  */
 LogEntries reorder(const LogEntries &entries) {
-    LogEntries extract_ranges(const LogEntries&);
+    std::map<ull, std::unordered_set<std::size_t>> rng_to_entries;
+    std::map<ull, std::unordered_set<std::size_t>>::const_iterator iter;
 
-    LogEntries ranges = extract_ranges(entries);
-    LogEntries::iterator hi, lo;
-
-    for (auto &entry : entries) {
-        std::tie(lo, hi) = std::equal_range(ranges.begin(), ranges.end(), 
-            entry, compare);
-
-        std::for_each(lo, hi, [&entry](LogEntry& val) {
-            val.bitrate += entry.bitrate;
-        });
-    }
-
-    lo = ranges.begin();
-    hi = ranges.end();
-
-    lo->streamed = lo->duration / 1000 * lo->bitrate;
-
-    while (++lo != hi) {
-        lo->streamed = lo->duration / 1000 * lo->bitrate;
-        lo->prev_streamed = (lo - 1)->prev_streamed + (lo - 1)->streamed;
-    }
-    return ranges;
-}
-
-/**
- * @brief Extract the non-overlapping ranges from the given log entries
- * @details The method ...
- * 
- * @param entries The vector of log entries from which to extract non
- * overlapping ranges from
- * @return A vector of Log Entries where all the entries are non overlapping
- */
-LogEntries extract_ranges(const LogEntries& entries) {
-    // Use a set to avoid duplicates and make the entries sorted 2 birds one set
-    std::set<ull> times;
-    std::set<ull>::const_iterator iter;
-
-    for (auto& entry : entries) {
-        times.insert(entry.starttime);
-        times.insert(entry.endtime);
+    for (std::size_t v = 0; v < entries.size(); v++) {
+        rng_to_entries[entries[v].starttime].insert(v);
+        rng_to_entries[entries[v].endtime].insert(v);
     }
 
     LogEntries merged;
-    LogEntry range = {};
+    std::unordered_set<std::size_t> main_set, var_set;
 
-    for (iter = times.begin(); ++iter != times.end(); ) {
+    for (iter = rng_to_entries.begin(); ++iter != rng_to_entries.end(); ) {
         --iter;
-        range.starttime = *iter++;
-        range.endtime = *iter;
+        LogEntry range = {};
+        std::tie(range.starttime, var_set) = *iter++;
+        range.endtime = iter->first;
         range.duration = range.endtime - range.starttime;
+
+        // determine all entries that overlap this range
+        for (auto &v : var_set) {
+            if (main_set.erase(v) == 0) {
+                main_set.insert(v);
+            }
+        }
+
+        // set the bitrate of this range to be an aggregate of bitrate of the overlaps
+        for (auto &v : main_set) {
+            range.bitrate += entries[v].bitrate;
+        }
+        // calculate the amount streamed
+        range.streamed = range.duration / 1000 * range.bitrate;
+
+        if (!merged.empty()) {
+            range.prev_streamed = merged.back().streamed + merged.back().prev_streamed;
+        }
         merged.push_back(range);
     }
     return merged;
