@@ -101,9 +101,13 @@ void repl(const LogEntries& entries, int count) {
             query.endtime = hi->endtime;
         }
 
-        query.streamed = (hi->prev_streamed - lo->prev_streamed - lo->streamed) +
-        ((lo->endtime - query.starttime) / lo->duration * lo->streamed) +
-        ((query.endtime - hi->starttime) / hi->duration * hi->streamed);
+        if (hi != lo) {
+            query.streamed = (hi->prev_streamed - lo->prev_streamed - lo->streamed) +
+            ((lo->endtime - query.starttime) / lo->duration * lo->streamed) +
+            ((query.endtime - hi->starttime) / hi->duration * hi->streamed);
+        } else {
+            query.streamed = (query.endtime - query.starttime) / 1000 * lo->bitrate;
+        }
 
         std::cout << query.streamed << '\n';
     }
@@ -118,24 +122,18 @@ void repl(const LogEntries& entries, int count) {
  * @param entries The initial entries we got as input
  */
 LogEntries reorder(const LogEntries &entries) {
-    struct HashPair {
-        std::size_t operator()(const std::pair<std::size_t, unsigned int>& k) const {
-            return k.first;
-        }
-    };
+    using index_set = std::unordered_set<std::size_t>;
 
-    using pair_set = std::unordered_set<std::pair<std::size_t, unsigned int>, HashPair>;
-
-    std::map<ull, pair_set> rng_to_entries;
-    std::map<ull, pair_set>::const_iterator iter;
+    std::map<ull, index_set> rng_to_entries;
+    std::map<ull, index_set>::const_iterator iter;
 
     for (std::size_t v = 0; v < entries.size(); v++) {
-        rng_to_entries[entries[v].starttime].emplace(v, entries[v].bitrate);
-        rng_to_entries[entries[v].endtime].emplace(v, entries[v].bitrate);
+        rng_to_entries[entries[v].starttime].insert(v);
+        rng_to_entries[entries[v].endtime].insert(v);
     }
 
     LogEntries merged;
-    pair_set main_set, var_set;
+    index_set main_set, var_set;
 
     unsigned int curr_bitrate = 0;
 
@@ -149,10 +147,10 @@ LogEntries reorder(const LogEntries &entries) {
         // determine all entries that overlap this range
         for (auto &v : var_set) {
             if (main_set.erase(v) == 0) {
-                curr_bitrate += v.second;
+                curr_bitrate += entries[v].bitrate;
                 main_set.insert(v);
             } else {
-                curr_bitrate -= v.second;
+                curr_bitrate -= entries[v].bitrate;
             }
         }
 
