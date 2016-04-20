@@ -23,6 +23,9 @@ bool compare(const LogEntry&, const LogEntry&);
 std::istream &operator >> (std::istream&, LogEntry&);
 
 #ifdef DEBUG
+template <typename T>
+std::ostream &operator << (std::ostream&, const std::vector<T>&);
+
 std::ostream &operator << (std::ostream&, const LogEntry&);
 
 template <typename F, typename S>
@@ -31,7 +34,9 @@ std::ostream &operator << (std::ostream&, const std::pair<F, S>&);
 
 int main() {
 
+    // Remove synchronization between cstdio and iostream
     std::ios_base::sync_with_stdio(false);
+    // Prevent flushing of output stream before each io operation
     std::cin.tie(nullptr);
 
     LogEntries logEntries;
@@ -42,11 +47,7 @@ int main() {
         std::back_inserter(logEntries));
 
     #ifdef DEBUG
-    std::cout << "\n";
-    for (auto& ent : logEntries) {
-        std::cout << ent << '\n';
-    }
-    std::cout << "\n\n";
+    // std::cout << "\n" << logEntries << "\n\n";
     #endif
 
     logEntries = std::move(reorder(logEntries));
@@ -91,6 +92,9 @@ void repl(const LogEntries& entries, int count) {
             query, compare);
 
         hi--;
+        #ifdef DEBUG
+        std::cout << query << std::endl << *lo << std::endl << *hi << std::endl;
+        #endif
 
         if (query.starttime < lo->starttime) {
             query.starttime = lo->starttime;
@@ -188,4 +192,12 @@ std::ostream &operator << (std::ostream& oss, const LogEntry& entry) {
 template <typename F, typename S>
 std::ostream &operator << (std::ostream& oss, const std::pair<F, S> &p) {
     return oss << "(First=>" << p.first << ", second=>" << p.second << ")";
+}
+
+template <typename T>
+std::ostream &operator << (std::ostream& oss, const std::vector<T>& v) {
+    for (auto& item : v) {
+        oss << item << "\n";
+    }
+    return oss;
 }
