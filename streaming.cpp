@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <map>
 #include <utility>
-#include <functional>
 #include <unordered_set>
 
 using ull = unsigned long long;
@@ -53,7 +52,7 @@ int main() {
     logEntries = std::move(reorder(logEntries));
 
     #ifdef DEBUG
-    // std::cout << "Count: " << logEntries.size() << '\n';
+    std::cout << "Count: " << logEntries.size() << '\n';
     for (auto& ent : logEntries) {
         std::cout << ent << '\n';
     }
@@ -106,9 +105,9 @@ void repl(const LogEntries& entries, int count) {
             ((lo->endtime - query.starttime) / lo->duration * lo->streamed) +
             ((query.endtime - hi->starttime) / hi->duration * hi->streamed);
         } else {
-            query.streamed = (query.endtime - query.starttime) / 1000 * lo->bitrate;
+            query.duration = query.endtime - query.starttime;
+            query.streamed = query.duration / 1000 * lo->bitrate;
         }
-
         std::cout << query.streamed << '\n';
     }
 }
