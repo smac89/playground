@@ -1,0 +1,15 @@
+{
+	"size":6,
+	"directed": false,
+	"edges": [
+		{"head": 1, "tail": 2},
+		{"head": 2, "tail": 3},
+		{"head": 2, "tail": 3},
+		{"head": 2, "tail": 4},
+		{"head": 3, "tail": 4},
+		{"head": 4, "tail": 5},
+		{"head": 5, "tail": 6},
+		{"head": 5, "tail": 6},
+		{"head": 5, "tail": 6}
+	]
+}
