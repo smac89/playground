@@ -4,7 +4,6 @@
 #include <vector>
 #include <iomanip>
 #include <map>
-#include <cmath>
 
 struct LogEntry {
     long long time;
@@ -147,6 +146,12 @@ LogEntries reorder(LogEntries &entries) {
     return merged;
 }
 
+/**
+ * @brief Reads the time ranges into the vector
+ * 
+ * @param vec The vector to use for this
+ * @param num The number of items to read in
+ */
 void read_entries(LogEntries& vec, std::size_t num) {
     vec.reserve(num << 1);
     long long tm;
