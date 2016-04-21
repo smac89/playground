@@ -1,3 +1,10 @@
-*.in
-*.out
-*.exe
+*
+!.gitignore
+!README*
+!LICENSE
+!**/
+!**/*.cpp
+!**/*.py
+!**.java
+!**/*.swift
+!**/*.sh
