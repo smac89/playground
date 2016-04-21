@@ -4,32 +4,30 @@
 #include <vector>
 #include <iomanip>
 #include <map>
-#include <utility>
-#include <unordered_set>
-
-using ull = unsigned long long;
+#include <cmath>
 
 struct LogEntry {
-    ull endtime, starttime;
-    unsigned int bitrate;
-    double streamed, prev_streamed, duration;
+    long long time;
+    int bitrate;
+    double total_streamed;
+
+    operator long long () const { return this->time; }
 };
+
+constexpr double MS_PER_SEC = 10 * 10 * 10;
 
 using LogEntries = std::vector<LogEntry>;
 
-LogEntries reorder(const LogEntries&);
-void repl(const LogEntries&, int);
-bool compare(const LogEntry&, const LogEntry&);
-std::istream &operator >> (std::istream&, LogEntry&);
+void repl(const LogEntries&, std::size_t);
+void read_entries(LogEntries&, std::size_t);
+LogEntries reorder(LogEntries&);
+
 
 #ifdef DEBUG
 template <typename T>
 std::ostream &operator << (std::ostream&, const std::vector<T>&);
 
 std::ostream &operator << (std::ostream&, const LogEntry&);
-
-template <typename F, typename S>
-std::ostream &operator << (std::ostream&, const std::pair<F, S>&);
 #endif
 
 int main() {
@@ -40,24 +38,20 @@ int main() {
     std::cin.tie(nullptr);
 
     LogEntries logEntries;
-    int logsize;
+    std::size_t logsize;
     std::cin >> logsize;
 
-    std::copy_n(std::istream_iterator<LogEntry>(std::cin), logsize,
-        std::back_inserter(logEntries));
+    read_entries(logEntries, logsize);
 
     #ifdef DEBUG
-    // std::cout << "\n" << logEntries << "\n\n";
+    std::cout << "\n" << logEntries << "\n\n";
     #endif
 
-    logEntries = std::move(reorder(logEntries));
+    logEntries = reorder(logEntries);
 
     #ifdef DEBUG
     std::cout << "Count: " << logEntries.size() << '\n';
-    for (auto& ent : logEntries) {
-        std::cout << ent << '\n';
-    }
-    std::cout << "\n\n";
+    std::cout << logEntries << "\n\n";
     #endif
 
     if (std::cin >> logsize) {
@@ -79,40 +73,33 @@ int main() {
  * function before it can be used here
  * @param count The number of queries to expect
  */
-void repl(const LogEntries& entries, int count) {
+void repl(const LogEntries& entries, std::size_t count) {
     LogEntries::const_iterator hi, lo;
-    LogEntry query;
+    long long start, end;
+    double streamed;
+
     std::cout.precision(3);
     std::cout.setf(std::ios_base::fixed);
 
-    for (std::cin >> query.starttime >> query.endtime; count--; 
-        std::cin >> query.starttime >> query.endtime) {
+    for (std::cin >> start >> end; count--; std::cin >> start >> end) {
 
-        std::tie(lo, hi) = std::equal_range(entries.begin(), entries.end(),
-            query, compare);
+        lo = std::lower_bound(entries.begin(), entries.end(), start);
+        hi = std::upper_bound(lo, entries.end(), end);
 
-        hi--;
+        if (hi == entries.end()) {
+            end = (hi - 1)->time;
+        }
+
         #ifdef DEBUG
-        std::cout << query << std::endl << *lo << std::endl << *hi << std::endl;
+        std::cout << lo->time << " <= " << start << "\n"
+        << (hi == entries.end() ? hi - 1 : hi)->time << " >= " << end << std::endl;
         #endif
+ 
+        streamed = (lo->time - start) / MS_PER_SEC * (lo == entries.begin() ? 0 : (lo - 1)->bitrate)
+        + (hi - 1)->total_streamed - lo->total_streamed +
+        (end - (hi - 1)->time) / MS_PER_SEC * (hi - 1)->bitrate;
 
-        if (query.starttime < lo->starttime) {
-            query.starttime = lo->starttime;
-        }
-
-        if (query.endtime > hi->endtime) {
-            query.endtime = hi->endtime;
-        }
-
-        if (hi != lo) {
-            query.streamed = (hi->prev_streamed - lo->prev_streamed - lo->streamed) +
-            ((lo->endtime - query.starttime) / lo->duration * lo->streamed) +
-            ((query.endtime - hi->starttime) / hi->duration * hi->streamed);
-        } else {
-            query.duration = query.endtime - query.starttime;
-            query.streamed = query.duration / 1000 * lo->bitrate;
-        }
-        std::cout << query.streamed << '\n';
+        std::cout << streamed << '\n';
     }
 }
 
@@ -124,74 +111,57 @@ void repl(const LogEntries& entries, int count) {
  * 
  * @param entries The initial entries we got as input
  */
-LogEntries reorder(const LogEntries &entries) {
-    using index_set = std::unordered_set<std::size_t>;
-
-    std::map<ull, index_set> rng_to_entries;
-    std::map<ull, index_set>::const_iterator iter;
-
-    for (std::size_t v = 0; v < entries.size(); v++) {
-        rng_to_entries[entries[v].starttime].insert(v);
-        rng_to_entries[entries[v].endtime].insert(v);
-    }
+LogEntries reorder(LogEntries &entries) {
+    std::sort(entries.begin(), entries.end(), 
+        [](const LogEntry& lhs, const LogEntry& rhs) {
+            return lhs.time < rhs.time;
+        });
 
     LogEntries merged;
-    index_set main_set, var_set;
 
-    unsigned int curr_bitrate = 0;
+    int bits = 0;
+    LogEntries::iterator iter;
+    LogEntry* prev = nullptr;
 
-    for (iter = rng_to_entries.begin(); ++iter != rng_to_entries.end(); ) {
-        --iter;
-        LogEntry range = {};
-        std::tie(range.starttime, var_set) = *iter++;
-        range.endtime = iter->first;
-        range.duration = range.endtime - range.starttime;
+    for (iter = entries.begin(); iter != entries.end(); ++iter) {
+        bits += iter->bitrate;
 
-        // determine all entries that overlap this range
-        for (auto &v : var_set) {
-            if (main_set.erase(v) == 0) {
-                curr_bitrate += entries[v].bitrate;
-                main_set.insert(v);
-            } else {
-                curr_bitrate -= entries[v].bitrate;
-            }
+        if (prev == nullptr) {
+            prev = &(*iter);
+            continue;
         }
 
-        // set the bitrate of this range to be an aggregate of bitrate of the overlaps
-        range.bitrate = curr_bitrate;
-        
-        // calculate the amount streamed
-        range.streamed = range.duration / 1000 * range.bitrate;
-
-        if (!merged.empty()) {
-            range.prev_streamed = merged.back().streamed + merged.back().prev_streamed;
+        if (iter->time == prev->time) {
+            prev->bitrate = bits;
+            continue;
         }
-        merged.push_back(range);
+
+        iter->total_streamed = prev->total_streamed + (iter->time - prev->time) / MS_PER_SEC * prev->bitrate;
+        iter->bitrate = bits;
+        merged.push_back(*prev);
+        prev = &(*iter);
     }
+    prev->bitrate = bits;
+    merged.push_back(*prev);
+
     return merged;
 }
 
-inline bool compare(const LogEntry& lhs, const LogEntry& rhs) {
-    return lhs.endtime <= rhs.starttime;
-}
+void read_entries(LogEntries& vec, std::size_t num) {
+    vec.reserve(num << 1);
+    long long tm;
+    int bit, dur;
 
-std::istream &operator >> (std::istream& iss, LogEntry& entry) {
-    iss >> entry.endtime >> entry.duration >> entry.bitrate;
-    entry.starttime = entry.endtime - entry.duration;
-    return iss;
+    while (num--) {
+        std::cin >> tm >> dur >> bit;
+        vec.push_back({tm, -bit, 0});
+        vec.push_back({tm - dur, bit, 0});
+    }
 }
 
 std::ostream &operator << (std::ostream& oss, const LogEntry& entry) {
-    oss << "start=" << entry.starttime << ", end=" << entry.endtime
-    << ", bitrate(s)=" << entry.bitrate << ", streamed(kb)="
-    << std::setprecision(3) << std::fixed << entry.streamed;
-
-    return oss;
-}
-
-template <typename F, typename S>
-std::ostream &operator << (std::ostream& oss, const std::pair<F, S> &p) {
-    return oss << "(First=>" << p.first << ", second=>" << p.second << ")";
+    return oss << "start=" << entry.time << ", bitrate(s)=" << entry.bitrate 
+    << ", streamed(kb)=" << std::setprecision(3) << std::fixed << entry.total_streamed;
 }
 
 template <typename T>
