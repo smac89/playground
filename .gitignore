@@ -1,11 +1,13 @@
-# Ignore all
-/*
-
-# Don't ignore directories
-!*/
-
-# Unignore all with extensions
-!*.*
+*
+!.gitignore
+!README*
+!LICENSE
+!**/
+!**/*.cpp
+!**/*.py
+!**.java
+!**/*.swift
+!**/*.sh
 
 # Ignore these folders
 12726/
