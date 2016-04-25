@@ -3,6 +3,20 @@ import operator
 import math
 from decimal import Decimal, getcontext, ROUND_DOWN
 
+class PowerTower(object):
+    __slots__ = ('tower_str')
+    
+    def __init__(self, tower_str):
+        self.tower_str = map(int, tower_str.split("^"))
+
+    def __lt__(self, other):
+        return True
+
+    @classmethod
+    def dosomething(cls, lhs, a, rhs, b):
+        pass
+
+
 def domath(cnt):
     lines = [sys.stdin.next().strip() for _ in xrange(cnt)]
     values = {line : (fake_exponent(map(int, line.split("^"))), cnt) for cnt, line in enumerate(lines)}
