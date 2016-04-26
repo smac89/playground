@@ -4,17 +4,22 @@ import math
 from decimal import Decimal, getcontext, ROUND_DOWN
 
 class PowerTower(object):
-    __slots__ = ('tower_str')
+    __slots__ = ('tower')
     
-    def __init__(self, tower_str):
-        self.tower_str = map(int, tower_str.split("^"))
+    def __init__(self, tower):
+        self.tower = tuple(map(int, tower.split("^")))
 
     def __lt__(self, other):
-        return True
+        return PowerTower.approximate(self.tower, other.tower)
 
-    @classmethod
-    def dosomething(cls, lhs, a, rhs, b):
-        pass
+    @staticmethod
+    def approximate(lhs, rhs):
+        def evalp(sl, sr):
+            return (0, 0)
+
+        v, w = evalp(1, 1)
+        return v / math.log(rhs[0]) < w / math.log(lhs[0])
+
 
 
 def domath(cnt):
