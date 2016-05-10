@@ -1,4 +1,6 @@
-*
+# Ignore all
+/*
+
 !.gitignore
 !README*
 !LICENSE
@@ -8,3 +10,7 @@
 !**.java
 !**/*.swift
 !**/*.sh
+
+# Ignore these folders
+12726/
+1570/
