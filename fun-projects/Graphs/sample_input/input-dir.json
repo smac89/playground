@@ -1,0 +1,11 @@
+{
+	"size":8,
+	"directed": true,
+	"edges": [
+		{"head": 1, "tail": 5},
+		{"head": 6, "tail": 2},
+		{"head": 3, "tail": 4},
+		{"head": 5, "tail": 8},
+		{"head": 2, "tail": 7}
+	]
+}
