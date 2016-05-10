@@ -3,12 +3,15 @@
 !README*
 !LICENSE
 !**/
+!**/*.c
 !**/*.cpp
 !**/*.py
 !**.java
 !**/*.swift
 !**/*.sh
+!**/*.pdf
 
 # Ignore these folders
 12726/
 1570/
+1288/
