@@ -10,6 +10,8 @@
 !**/*.swift
 !**/*.sh
 !**/*.pdf
+!**/*.hs
+!**/*.php
 
 # Ignore these folders
 12726/
