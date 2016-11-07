@@ -1,5 +1,4 @@
 *
-!.gitignore
 !README*
 !LICENSE
 !**/
@@ -12,6 +11,7 @@
 !**/*.pdf
 !**/*.hs
 !**/*.php
+!**/.gitignore
 
 # Ignore these folders
 12726/
