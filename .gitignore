@@ -12,8 +12,3 @@
 !**/*.hs
 !**/*.php
 !**/.gitignore
-
-# Ignore these folders
-12726/
-1570/
-1288/
